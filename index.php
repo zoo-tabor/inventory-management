@@ -17,6 +17,11 @@ if (file_exists(__DIR__ . '/.env')) {
     ini_set('display_errors', '1');
 }
 
+// Configure session BEFORE starting it
+ini_set('session.gc_maxlifetime', 7200);
+ini_set('session.cookie_lifetime', 7200);
+session_name('skladovy_system');
+
 // Start session
 session_start();
 
