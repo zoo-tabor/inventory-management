@@ -1,0 +1,41 @@
+# Environment configuration
+.env
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+cron/*.log
+cron/cron_log.txt
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# Upload directories
+uploads/*
+!uploads/.gitkeep
+
+# Dependencies (if using Composer in future)
+/vendor/
+
+# Build artifacts
+/dist/
+/build/
+
+# Database backups
+*.sql
+*.sql.gz
+backup/

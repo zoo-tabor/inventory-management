@@ -1,0 +1,32 @@
+name: Deploy to Wedos
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: FTP Deploy
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          server-dir: /www/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            .env
+            README.md
+            .github/**
+            .vscode/**
+            .idea/**
+            *.md
+            cron/*.log
