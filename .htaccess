@@ -1,31 +1,44 @@
-# Enable Rewrite Engine
+# =============================================
+# Skladový systém - Apache Configuration
+# WEDOS Hosting Compatible
+# =============================================
+
+# Enable rewrite engine
 RewriteEngine On
 
-# Force HTTPS (optional - uncomment for production)
-# RewriteCond %{HTTPS} off
-# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# HTTPS Enforcement
+RewriteCond %{HTTPS} off
+RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 
 # Prevent directory browsing
 Options -Indexes
 
-# Block access to sensitive files
-<FilesMatch "^\.env">
-    Order allow,deny
-    Deny from all
+# Block access to sensitive files and directories
+<FilesMatch "\.(env|htaccess|htpasswd|ini|log|sh|inc|bak|sql)$">
+    Require all denied
 </FilesMatch>
 
-<FilesMatch "^composer\.(json|lock)$">
-    Order allow,deny
-    Deny from all
+# Block access to config and system files
+<FilesMatch "^(composer\.(json|lock)|\.git.*)$">
+    Require all denied
 </FilesMatch>
 
-# Route all requests to index.php except existing files
+# Protect directories from direct access
+RewriteRule ^config/ - [F,L]
+RewriteRule ^classes/ - [F,L]
+RewriteRule ^includes/ - [F,L]
+RewriteRule ^install/ - [F,L]
+RewriteRule ^pages/ - [F,L]
+
+# Allow access to public assets
+<FilesMatch "\.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot|webp|pdf)$">
+    Require all granted
+</FilesMatch>
+
+# Main routing - redirect all requests to index.php
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_URI} !^/install/
-RewriteCond %{REQUEST_URI} !^/assets/
-RewriteCond %{REQUEST_URI} !^/api/
-RewriteRule ^(.*)$ index.php?route=$1 [L,QSA]
+RewriteRule ^(.*)$ index.php?route=$1 [QSA,L]
 
 # PHP Settings
 <IfModule mod_php.c>
