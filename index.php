@@ -4,7 +4,7 @@
  * Skladový systém
  */
 
-n// Enable error logging to file
+// Enable error logging to file
 ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/php_errors.log');
 // Error reporting based on environment
