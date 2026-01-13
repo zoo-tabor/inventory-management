@@ -34,8 +34,8 @@ ini_set('session.cookie_lifetime', SESSION_LIFETIME);
 session_name(SESSION_NAME);
 
 // Application constants
-define('APP_NAME', 'Skladový systém');
-define('APP_VERSION', '1.0.0');
+if (!defined('APP_NAME')) define('APP_NAME', 'Skladový systém');
+if (!defined('APP_VERSION')) define('APP_VERSION', '1.0.0');
 
 // Path constants
 define('ROOT_PATH', dirname(__DIR__));
