@@ -4,7 +4,7 @@
  * Seeds initial data for companies, settings, and default admin user
  */
 
-function up($db) {
+return function($db) {
     // Insert companies
     $db->exec("
         INSERT INTO `companies` (`name`, `code`, `theme`, `logo`) VALUES
@@ -76,4 +76,4 @@ function up($db) {
         $stmt->execute($category);
     }
     echo "    <div class=\"info\">✓ Vloženy ukázkové kategorie</div>\n";
-}
+};

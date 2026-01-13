@@ -4,7 +4,7 @@
  * Creates all initial database tables
  */
 
-function up($db) {
+return function($db) {
     // Disable foreign key checks temporarily
     $db->exec("SET FOREIGN_KEY_CHECKS = 0");
 
@@ -365,4 +365,4 @@ function up($db) {
     $db->exec("SET FOREIGN_KEY_CHECKS = 1");
 
     echo "    <div class=\"info\">✓ Vytvořeny všechny tabulky</div>\n";
-}
+};

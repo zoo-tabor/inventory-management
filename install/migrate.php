@@ -91,28 +91,25 @@ foreach ($migrationFiles as $file) {
     flush();
 
     try {
-        // Include migration file
-        require_once $file;
+        // Execute migration in isolated scope
+        $migrationExecutor = function($migrationFile, $database) {
+            // Include migration file and execute it
+            $migration = include $migrationFile;
 
-        // Execute up() function if exists
-        if (function_exists('up')) {
-            up($db);
+            // If migration returns a callable, execute it
+            if (is_callable($migration)) {
+                $migration($database);
+            }
+        };
 
-            // Record migration
-            $stmt = $db->prepare("INSERT INTO migrations (migration, batch) VALUES (?, ?)");
-            $stmt->execute([$migrationName, $nextBatch]);
+        $migrationExecutor($file, $db);
 
-            echo "    <div class=\"success\">✅ Úspěch: {$migrationName}</div>\n";
-            $executedCount++;
-        } else {
-            echo "    <div class=\"error\">❌ Chyba: Migrace {$migrationName} neobsahuje funkci up()</div>\n";
-        }
+        // Record migration
+        $stmt = $db->prepare("INSERT INTO migrations (migration, batch) VALUES (?, ?)");
+        $stmt->execute([$migrationName, $nextBatch]);
 
-        // Clean up function for next migration
-        if (function_exists('up')) {
-            // Undefine function - not possible in PHP, so we'll use a different approach
-            // Each migration will have a unique function name
-        }
+        echo "    <div class=\"success\">✅ Úspěch: {$migrationName}</div>\n";
+        $executedCount++;
 
     } catch (Exception $e) {
         echo "    <div class=\"error\">❌ Chyba při provádění {$migrationName}: " . htmlspecialchars($e->getMessage()) . "</div>\n";
