@@ -19,7 +19,7 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASS }}
-          server-dir: /subdom/officeo/
+          server-dir: /
           exclude: |
             **/.git*
             **/.git*/**
