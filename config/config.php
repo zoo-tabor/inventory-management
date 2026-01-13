@@ -28,10 +28,12 @@ date_default_timezone_set(TIMEZONE);
 if (!defined('SESSION_LIFETIME')) define('SESSION_LIFETIME', 7200);
 if (!defined('SESSION_NAME')) define('SESSION_NAME', 'skladovy_system');
 
-// Configure session
-ini_set('session.gc_maxlifetime', SESSION_LIFETIME);
-ini_set('session.cookie_lifetime', SESSION_LIFETIME);
-session_name(SESSION_NAME);
+// Configure session (only if session hasn't started yet)
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.gc_maxlifetime', SESSION_LIFETIME);
+    ini_set('session.cookie_lifetime', SESSION_LIFETIME);
+    session_name(SESSION_NAME);
+}
 
 // Application constants
 if (!defined('APP_NAME')) define('APP_NAME', 'Skladový systém');
