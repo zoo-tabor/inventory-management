@@ -69,6 +69,18 @@ switch ($page) {
         header('Location: /login');
         exit;
 
+    case 'switch-company':
+        // Handle company switching
+        $companyId = (int)($_GET['id'] ?? 0);
+        if (isset(COMPANIES[$companyId])) {
+            setCurrentCompany($companyId);
+            setFlash('success', 'Společnost přepnuta na ' . COMPANIES[$companyId]['name']);
+        } else {
+            setFlash('error', 'Neplatná společnost');
+        }
+        header('Location: /dashboard');
+        exit;
+
     case 'dashboard':
         require __DIR__ . '/pages/dashboard.php';
         break;
