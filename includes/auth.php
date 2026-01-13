@@ -9,9 +9,7 @@
  * @return bool
  */
 function isLoggedIn() {
-    $result = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
-    error_log("DEBUG isLoggedIn(): result=" . ($result ? 'true' : 'false') . ", SESSION data: " . print_r($_SESSION, true));
-    return $result;
+    return isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
 }
 
 /**
