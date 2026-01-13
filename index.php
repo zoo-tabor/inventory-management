@@ -75,7 +75,7 @@ switch ($page) {
 
     case 'logout':
         session_destroy();
-        header('Location: /login');
+        header('Location: index.php?route=login');
         exit;
 
     case 'switch-company':
@@ -167,7 +167,7 @@ switch ($page) {
 <body>
     <h1>404</h1>
     <p>Požadovaná stránka nebyla nalezena.</p>
-    <a href="/dashboard">Zpět na dashboard</a>
+    <a href="index.php?route=dashboard">Zpět na dashboard</a>
 </body>
 </html>';
         break;
