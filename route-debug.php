@@ -49,12 +49,22 @@
     ?></pre>
 
     <h2>Test Links</h2>
+    <p><strong>Click these and see what parameters are passed:</strong></p>
     <ul>
         <li><a href="/categories">Pretty URL: /categories</a></li>
-        <li><a href="/index.php?route=categories">Query Param: ?route=categories</a></li>
+        <li><a href="index.php?route=categories">Query Param: ?route=categories</a></li>
         <li><a href="/locations">Pretty URL: /locations</a></li>
-        <li><a href="/index.php?route=locations">Query Param: ?route=locations</a></li>
+        <li><a href="index.php?route=locations">Query Param: ?route=locations</a></li>
+        <li><a href="route-debug.php?test=working">Test with query param</a></li>
     </ul>
+
+    <h2>Expected vs Actual</h2>
+    <pre><?php
+    echo "When you click /categories, we expect:\n";
+    echo "  - \$_GET['route'] = 'categories'\n\n";
+    echo "Current \$_GET['route']: " . (isset($_GET['route']) ? $_GET['route'] : 'NOT SET') . "\n";
+    echo "Current \$_GET['test']: " . (isset($_GET['test']) ? $_GET['test'] : 'NOT SET') . "\n";
+    ?></pre>
 
     <h2>Apache mod_rewrite Test</h2>
     <pre><?php

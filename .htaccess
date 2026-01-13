@@ -36,6 +36,9 @@ RewriteRule ^pages/ - [F,L]
 </FilesMatch>
 
 # Main routing - redirect all requests to index.php
+# Get the base path for subdirectory installation
+RewriteBase /
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ index.php?route=$1 [QSA,L]
