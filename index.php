@@ -42,12 +42,19 @@ spl_autoload_register(function ($class) {
 // Get route from URL
 $route = isset($_GET['route']) ? trim($_GET['route'], '/') : '';
 
+// DEBUG: Log route access
+if (defined('APP_DEBUG') && APP_DEBUG === 'true') {
+    error_log("DEBUG: Route = '$route', Session user_id = " . ($_SESSION['user_id'] ?? 'NOT SET'));
+}
+
 // Route handling
 if (empty($route)) {
     // Default route - redirect to dashboard or login
     if (isLoggedIn()) {
+        error_log("DEBUG: Empty route, user is logged in, redirecting to /dashboard");
         header('Location: /dashboard');
     } else {
+        error_log("DEBUG: Empty route, user NOT logged in, showing login page");
         require __DIR__ . '/pages/login.php';
     }
     exit;
@@ -90,6 +97,7 @@ switch ($page) {
         exit;
 
     case 'dashboard':
+        error_log("DEBUG: Loading dashboard.php for user_id = " . ($_SESSION['user_id'] ?? 'NOT SET'));
         require __DIR__ . '/pages/dashboard.php';
         break;
 

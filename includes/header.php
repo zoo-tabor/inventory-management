@@ -4,7 +4,9 @@
  * Includes navigation, company switcher, notifications, user menu
  */
 
+error_log("DEBUG header.php: isLoggedIn() = " . (isLoggedIn() ? 'YES' : 'NO') . ", user_id = " . ($_SESSION['user_id'] ?? 'NOT SET'));
 if (!isLoggedIn()) {
+    error_log("DEBUG header.php: User NOT logged in, redirecting to /login");
     redirect('/login');
 }
 
