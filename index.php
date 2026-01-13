@@ -51,13 +51,14 @@ if (defined('APP_DEBUG') && APP_DEBUG === 'true') {
 if (empty($route)) {
     // Default route - redirect to dashboard or login
     if (isLoggedIn()) {
-        error_log("DEBUG: Empty route, user is logged in, redirecting to /dashboard");
-        header('Location: /dashboard');
+        error_log("DEBUG: Empty route, user is logged in, showing dashboard directly");
+        // Don't redirect - just set route to dashboard and continue
+        $route = 'dashboard';
     } else {
         error_log("DEBUG: Empty route, user NOT logged in, showing login page");
         require __DIR__ . '/pages/login.php';
+        exit;
     }
-    exit;
 }
 
 // Parse route
