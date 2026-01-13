@@ -41,7 +41,7 @@ $themeClass = getThemeClass();
                     </button>
                     <div class="company-switcher-dropdown" id="companySwitcherDropdown">
                         <?php foreach (COMPANIES as $compId => $company): ?>
-                            <a href="/switch-company?id=<?= $compId ?>"
+                            <a href="<?= url('switch-company', ['id' => $compId]) ?>"
                                class="company-item <?= $compId === getCurrentCompanyId() ? 'active' : '' ?>">
                                 <?= e($company['name']) ?>
                                 <?php if ($compId === getCurrentCompanyId()): ?>
@@ -74,9 +74,9 @@ $themeClass = getThemeClass();
                         </div>
                         <div class="user-menu-divider"></div>
                         <?php if (isAdmin()): ?>
-                            <a href="/settings" class="user-menu-item">⚙️ Nastavení</a>
+                            <a href="<?= url('settings') ?>" class="user-menu-item">⚙️ Nastavení</a>
                         <?php endif; ?>
-                        <a href="/logout" class="user-menu-item text-danger">🚪 Odhlásit se</a>
+                        <a href="<?= url('logout') ?>" class="user-menu-item text-danger">🚪 Odhlásit se</a>
                     </div>
                 </div>
             </div>
@@ -86,67 +86,67 @@ $themeClass = getThemeClass();
         <nav class="app-sidebar">
             <ul class="nav-menu">
                 <li class="nav-item">
-                    <a href="/dashboard" class="nav-link <?= $_SERVER['REQUEST_URI'] === '/dashboard' ? 'active' : '' ?>">
+                    <a href="<?= url('dashboard') ?>" class="nav-link <?= ($_GET['route'] ?? '') === 'dashboard' ? 'active' : '' ?>">
                         📊 Dashboard
                     </a>
                 </li>
 
                 <li class="nav-section">Sklad</li>
                 <li class="nav-item">
-                    <a href="/stock" class="nav-link">
+                    <a href="<?= url('stock') ?>" class="nav-link">
                         📦 Přehled skladu
                     </a>
                 </li>
 
                 <li class="nav-section">Pohyby</li>
                 <li class="nav-item">
-                    <a href="/movements/vydej" class="nav-link">
+                    <a href="<?= url('movements/vydej') ?>" class="nav-link">
                         ➖ Nový výdej
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="/movements/prijem" class="nav-link">
+                    <a href="<?= url('movements/prijem') ?>" class="nav-link">
                         ➕ Nový příjem
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="/movements" class="nav-link">
+                    <a href="<?= url('movements') ?>" class="nav-link">
                         🔄 Historie pohybů
                     </a>
                 </li>
 
                 <li class="nav-section">Inventura</li>
                 <li class="nav-item">
-                    <a href="/stocktaking" class="nav-link">
+                    <a href="<?= url('stocktaking') ?>" class="nav-link">
                         📋 Seznam inventur
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="/stocktaking/start" class="nav-link">
+                    <a href="<?= url('stocktaking/start') ?>" class="nav-link">
                         ✨ Nová inventura
                     </a>
                 </li>
 
                 <li class="nav-section">Reporty</li>
                 <li class="nav-item">
-                    <a href="/reports/by-department" class="nav-link">
+                    <a href="<?= url('reports/by-department') ?>" class="nav-link">
                         📈 Dle oddělení
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="/reports/by-employee" class="nav-link">
+                    <a href="<?= url('reports/by-employee') ?>" class="nav-link">
                         👤 Dle zaměstnance
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="/reports/by-item" class="nav-link">
+                    <a href="<?= url('reports/by-item') ?>" class="nav-link">
                         📦 Dle položky
                     </a>
                 </li>
 
                 <li class="nav-section">Objednávky</li>
                 <li class="nav-item">
-                    <a href="/orders" class="nav-link">
+                    <a href="<?= url('orders') ?>" class="nav-link">
                         🛒 Návrhy objednávek
                     </a>
                 </li>
@@ -154,32 +154,32 @@ $themeClass = getThemeClass();
                 <?php if (isAdmin()): ?>
                     <li class="nav-section">Správa</li>
                     <li class="nav-item">
-                        <a href="/items" class="nav-link">
+                        <a href="<?= url('items') ?>" class="nav-link">
                             📝 Položky
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="/categories" class="nav-link">
+                        <a href="<?= url('categories') ?>" class="nav-link">
                             🏷️ Kategorie
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="/locations" class="nav-link">
+                        <a href="<?= url('locations') ?>" class="nav-link">
                             📍 Sklady
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="/departments" class="nav-link">
+                        <a href="<?= url('departments') ?>" class="nav-link">
                             🏢 Oddělení
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="/employees" class="nav-link">
+                        <a href="<?= url('employees') ?>" class="nav-link">
                             👥 Zaměstnanci
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="/users" class="nav-link">
+                        <a href="<?= url('users') ?>" class="nav-link">
                             👤 Uživatelé
                         </a>
                     </li>

@@ -14,11 +14,32 @@ function e($string) {
 }
 
 /**
+ * Generate URL for route
+ *
+ * @param string $route Route path (e.g., 'categories', 'items/edit')
+ * @param array $params Additional query parameters
+ * @return string Generated URL
+ */
+function url($route, $params = []) {
+    $url = 'index.php?route=' . urlencode($route);
+
+    foreach ($params as $key => $value) {
+        $url .= '&' . urlencode($key) . '=' . urlencode($value);
+    }
+
+    return $url;
+}
+
+/**
  * Redirect to URL
  *
  * @param string $url URL to redirect to
  */
 function redirect($url) {
+    // If URL doesn't start with http or /, add index.php?route=
+    if (strpos($url, 'http') !== 0 && strpos($url, 'index.php') !== 0) {
+        $url = url(ltrim($url, '/'));
+    }
     header('Location: ' . $url);
     exit;
 }
