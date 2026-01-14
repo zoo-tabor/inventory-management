@@ -66,4 +66,16 @@ return function($db) {
             ADD UNIQUE KEY `unique_category_name` (`company_id`, `name`)
         ");
     }
+
+    // Check if description column exists
+    $stmt = $db->query("SHOW COLUMNS FROM `categories` LIKE 'description'");
+    $hasDescription = $stmt->rowCount() > 0;
+
+    if (!$hasDescription) {
+        // Add description column
+        $db->exec("
+            ALTER TABLE `categories`
+            ADD COLUMN `description` TEXT NULL AFTER `name`
+        ");
+    }
 };

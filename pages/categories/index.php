@@ -95,7 +95,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } catch (Exception $e) {
         error_log("Categories error: " . $e->getMessage());
-        setFlash('error', 'Došlo k chybě při zpracování požadavku.');
+        // Check for duplicate key error
+        if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
+            setFlash('error', 'Kategorie s tímto názvem již existuje.');
+        } else {
+            setFlash('error', 'Došlo k chybě při zpracování požadavku: ' . $e->getMessage());
+        }
     }
 
     redirect('/categories');
