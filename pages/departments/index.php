@@ -205,7 +205,7 @@ include __DIR__ . '/../../includes/header.php';
             <h2 id="modalTitle">Nové oddělení</h2>
             <button type="button" class="modal-close" onclick="closeModal()">&times;</button>
         </div>
-        <form method="POST" action="/departments">
+        <form method="POST" action="<?= url('departments') ?>">
             <?= csrfField() ?>
             <input type="hidden" name="action" id="formAction" value="create">
             <input type="hidden" name="id" id="departmentId">
@@ -250,7 +250,7 @@ include __DIR__ . '/../../includes/header.php';
             <h2>Smazat oddělení?</h2>
             <button type="button" class="modal-close" onclick="closeDeleteModal()">&times;</button>
         </div>
-        <form method="POST" action="/departments">
+        <form method="POST" action="<?= url('departments') ?>">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="id" id="deleteId">
