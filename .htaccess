@@ -27,24 +27,12 @@ Options -Indexes
 RewriteRule ^config/ - [F,L]
 RewriteRule ^classes/ - [F,L]
 RewriteRule ^includes/ - [F,L]
-# RewriteRule ^install/ - [F,L]  # Temporarily commented to allow migrations
 RewriteRule ^pages/ - [F,L]
 
 # Allow access to public assets
 <FilesMatch "\.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot|webp|pdf)$">
     Require all granted
 </FilesMatch>
-
-# Main routing - redirect all requests to index.php
-# Get the base path for subdirectory installation
-RewriteBase /
-
-# Exclude install directory from rewriting
-RewriteRule ^install/ - [L]
-
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(.*)$ index.php?route=$1 [QSA,L]
 
 # PHP Settings
 <IfModule mod_php.c>
