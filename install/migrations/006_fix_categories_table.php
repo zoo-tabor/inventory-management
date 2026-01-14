@@ -5,10 +5,18 @@
  */
 
 return function($db) {
-    // Add company_id column
+    // Add company_id column WITHOUT foreign key first
     $db->exec("
         ALTER TABLE `categories`
-        ADD COLUMN `company_id` INT UNSIGNED NOT NULL AFTER `id`,
+        ADD COLUMN `company_id` INT UNSIGNED NOT NULL DEFAULT 1 AFTER `id`
+    ");
+
+    // Update existing categories to belong to company 1 (EKOSPOL)
+    $db->exec("UPDATE `categories` SET `company_id` = 1");
+
+    // Now add the foreign key constraint
+    $db->exec("
+        ALTER TABLE `categories`
         ADD FOREIGN KEY (`company_id`) REFERENCES `companies`(`id`) ON DELETE CASCADE
     ");
 
@@ -18,9 +26,6 @@ return function($db) {
         ADD COLUMN `parent_id` INT UNSIGNED NULL AFTER `company_id`,
         ADD FOREIGN KEY (`parent_id`) REFERENCES `categories`(`id`) ON DELETE CASCADE
     ");
-
-    // Update existing categories to belong to company 1 (EKOSPOL)
-    $db->exec("UPDATE `categories` SET `company_id` = 1 WHERE `company_id` = 0");
 
     // Remove the old UNIQUE constraint on name (should be unique per company)
     $db->exec("ALTER TABLE `categories` DROP INDEX `name`");
