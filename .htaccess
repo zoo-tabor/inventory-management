@@ -13,7 +13,7 @@ RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 # Prevent directory browsing
 Options -Indexes
 
-# Block access to sensitive files and directories
+# Block access to sensitive files
 <FilesMatch "\.(env|htaccess|htpasswd|ini|log|sh|inc|bak|sql)$">
     Require all denied
 </FilesMatch>
@@ -23,16 +23,11 @@ Options -Indexes
     Require all denied
 </FilesMatch>
 
-# Protect directories from direct access
+# Block direct access to specific directories
 RewriteRule ^config/ - [F,L]
 RewriteRule ^classes/ - [F,L]
 RewriteRule ^includes/ - [F,L]
 RewriteRule ^pages/ - [F,L]
-
-# Allow access to public assets
-<FilesMatch "\.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot|webp|pdf)$">
-    Require all granted
-</FilesMatch>
 
 # PHP Settings
 <IfModule mod_php.c>
