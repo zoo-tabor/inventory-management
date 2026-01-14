@@ -27,7 +27,7 @@ Options -Indexes
 RewriteRule ^config/ - [F,L]
 RewriteRule ^classes/ - [F,L]
 RewriteRule ^includes/ - [F,L]
-RewriteRule ^install/ - [F,L]
+# RewriteRule ^install/ - [F,L]  # Temporarily commented to allow migrations
 RewriteRule ^pages/ - [F,L]
 
 # Allow access to public assets
