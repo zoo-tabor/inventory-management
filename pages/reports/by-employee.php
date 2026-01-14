@@ -19,11 +19,11 @@ $dateTo = sanitize($_GET['date_to'] ?? date('Y-m-d')); // Today
 
 // Get employees
 $stmt = $db->prepare("
-    SELECT e.id, e.first_name, e.last_name, d.name as department_name
+    SELECT e.id, e.full_name, d.name as department_name
     FROM employees e
     LEFT JOIN departments d ON e.department_id = d.id
     WHERE e.company_id = ?
-    ORDER BY e.first_name, e.last_name
+    ORDER BY e.full_name
 ");
 $stmt->execute([getCurrentCompanyId()]);
 $employees = $stmt->fetchAll();
@@ -63,8 +63,8 @@ $whereSQL = implode(' AND ', $whereClauses);
 $stmt = $db->prepare("
     SELECT
         e.id,
-        e.first_name,
-        e.last_name,
+        e.full_name,
+        
         d.name as department_name,
         COUNT(DISTINCT CASE WHEN sm.movement_type = 'prijem' THEN sm.id END) as total_receipts,
         COUNT(DISTINCT CASE WHEN sm.movement_type = 'vydej' THEN sm.id END) as total_issues,
@@ -80,7 +80,7 @@ $stmt = $db->prepare("
     " . ($departmentFilter > 0 ? "AND e.department_id = ?" : "") . "
     GROUP BY e.id
     HAVING total_movements > 0
-    ORDER BY total_movements DESC, e.first_name, e.last_name
+    ORDER BY total_movements DESC, e.full_name
 ");
 
 $statsParams = [...$params, getCurrentCompanyId()];
@@ -167,7 +167,7 @@ require __DIR__ . '/../../includes/header.php';
                         <option value="">Všichni zaměstnanci</option>
                         <?php foreach ($employees as $emp): ?>
                             <option value="<?= $emp['id'] ?>" <?= $employeeFilter === $emp['id'] ? 'selected' : '' ?>>
-                                <?= e($emp['first_name']) ?> <?= e($emp['last_name']) ?>
+                                <?= e($emp['full_name']) ?> <?= e($emp) ?>
                                 <?php if ($emp['department_name']): ?>
                                     (<?= e($emp['department_name']) ?>)
                                 <?php endif; ?>
@@ -254,7 +254,7 @@ require __DIR__ . '/../../includes/header.php';
                             <tr class="<?= $employeeFilter === $stat['id'] ? 'row-selected' : '' ?>">
                                 <td>
                                     <strong>
-                                        <?= e($stat['first_name']) ?> <?= e($stat['last_name']) ?>
+                                        <?= e($stat['full_name']) ?> <?= e($stat) ?>
                                     </strong>
                                 </td>
                                 <td><?= e($stat['department_name'] ?? '-') ?></td>

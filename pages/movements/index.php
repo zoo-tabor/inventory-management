@@ -35,7 +35,7 @@ $stmt = $db->prepare("SELECT id, name FROM locations WHERE company_id = ? ORDER 
 $stmt->execute([getCurrentCompanyId()]);
 $locations = $stmt->fetchAll();
 
-$stmt = $db->prepare("SELECT id, first_name, last_name FROM employees WHERE company_id = ? ORDER BY first_name, last_name");
+$stmt = $db->prepare("SELECT id, full_name FROM employees WHERE company_id = ? ORDER BY full_name");
 $stmt->execute([getCurrentCompanyId()]);
 $employees = $stmt->fetchAll();
 
@@ -110,8 +110,8 @@ $stmt = $db->prepare("
         i.code as item_code,
         i.unit as item_unit,
         l.name as location_name,
-        e.first_name as employee_first_name,
-        e.last_name as employee_last_name,
+        e.full_name as employee_name,
+        
         d.name as department_name,
         u.full_name as user_name
     FROM stock_movements sm
@@ -244,7 +244,7 @@ require __DIR__ . '/../../includes/header.php';
                         <option value="">Všichni zaměstnanci</option>
                         <?php foreach ($employees as $emp): ?>
                             <option value="<?= $emp['id'] ?>" <?= $employeeFilter === $emp['id'] ? 'selected' : '' ?>>
-                                <?= e($emp['first_name']) ?> <?= e($emp['last_name']) ?>
+                                <?= e($emp['full_name']) ?> <?= e($emp) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -352,8 +352,8 @@ require __DIR__ . '/../../includes/header.php';
                                 </td>
                                 <td><?= e($movement['location_name'] ?? '-') ?></td>
                                 <td>
-                                    <?php if ($movement['employee_first_name']): ?>
-                                        <?= e($movement['employee_first_name']) ?> <?= e($movement['employee_last_name']) ?>
+                                    <?php if ($movement['employee_name']): ?>
+                                        <?= e($movement['employee_name']) ?>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>

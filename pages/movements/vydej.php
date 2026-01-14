@@ -143,7 +143,7 @@ $stmt = $db->prepare("
     FROM employees e
     LEFT JOIN departments d ON e.department_id = d.id
     WHERE e.company_id = ? AND e.is_active = 1
-    ORDER BY e.first_name, e.last_name
+    ORDER BY e.full_name
 ");
 $stmt->execute([getCurrentCompanyId()]);
 $employees = $stmt->fetchAll();
@@ -237,7 +237,7 @@ require __DIR__ . '/../../includes/header.php';
                         <option value="">-- Vyberte zaměstnance --</option>
                         <?php foreach ($employees as $employee): ?>
                             <option value="<?= $employee['id'] ?>">
-                                <?= e($employee['first_name']) ?> <?= e($employee['last_name']) ?>
+                                <?= e($employee['full_name']) ?> <?= e($employee) ?>
                                 <?php if ($employee['department_name']): ?>
                                     - <?= e($employee['department_name']) ?>
                                 <?php endif; ?>

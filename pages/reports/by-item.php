@@ -127,8 +127,8 @@ if ($itemId > 0) {
             SELECT
                 sm.*,
                 l.name as location_name,
-                e.first_name as employee_first_name,
-                e.last_name as employee_last_name,
+                e.full_name as employee_name,
+                
                 d.name as department_name,
                 u.full_name as user_name
             FROM stock_movements sm
@@ -416,8 +416,8 @@ require __DIR__ . '/../../includes/header.php';
                                 </td>
                                 <td><?= e($movement['location_name'] ?? '-') ?></td>
                                 <td>
-                                    <?php if ($movement['employee_first_name']): ?>
-                                        <?= e($movement['employee_first_name']) ?> <?= e($movement['employee_last_name']) ?>
+                                    <?php if ($movement['employee_name']): ?>
+                                        <?= e($movement['employee_name']) ?>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
