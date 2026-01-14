@@ -107,7 +107,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } catch (Exception $e) {
         error_log("Departments error: " . $e->getMessage());
-        setFlash('error', 'Došlo k chybě při zpracování požadavku.');
+        // Check for duplicate key error
+        if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
+            setFlash('error', 'Kód oddělení již existuje. Zvolte prosím jiný kód.');
+        } else {
+            setFlash('error', 'Došlo k chybě při zpracování požadavku: ' . $e->getMessage());
+        }
     }
 
     redirect('/departments');
