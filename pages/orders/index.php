@@ -4,13 +4,6 @@
  * Automatically suggest items to order based on stock levels
  */
 
-// Enable error display for debugging
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-try {
-
 if (!isLoggedIn()) {
     redirect('/login');
 }
@@ -113,7 +106,7 @@ require __DIR__ . '/../../includes/header.php';
         <button type="button" class="btn btn-success" onclick="exportToCSV()">
             📥 Export do CSV
         </button>
-        <button type="button" class="btn btn-primary" onclick="printOrders()">
+        <button type="button" class="btn btn-primary" onclick="showBulkExport()">
             🖨️ Tisk
         </button>
     </div>
@@ -310,6 +303,41 @@ require __DIR__ . '/../../includes/header.php';
     </div>
 </div>
 
+<!-- Bulk Export Modal -->
+<div id="bulkExportModal" class="modal">
+    <div class="modal-content modal-md">
+        <div class="modal-header">
+            <h2>Hromadné přidání položek</h2>
+            <button type="button" class="modal-close" onclick="closeBulkExportModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="info-box">
+                <strong>ℹ️</strong> Sem můžete snadno zkopírovat seznam zboží z excelové nebo jiné tabulky.
+                Objednací číslo a množství oddělte mezerou, čárkou nebo středníkem.
+                Další položku vložte na nový řádek. Příklad níže:
+                <div style="margin-top: 0.5rem; font-family: monospace; background: #f5f5f5; padding: 0.5rem; border-radius: 4px;">
+                    123.100 5<br>
+                    546.152 3
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 1rem;">
+                <textarea
+                    id="bulkExportTextarea"
+                    class="form-control"
+                    rows="10"
+                    placeholder="Vložte seznam položek..."
+                    style="font-family: monospace;"
+                ></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeBulkExportModal()">Zavřít</button>
+            <button type="button" class="btn btn-primary" onclick="copyBulkExport()">📋 Kopírovat</button>
+        </div>
+    </div>
+</div>
+
 <style>
 .stats-grid {
     display: grid;
@@ -412,6 +440,89 @@ require __DIR__ . '/../../includes/header.php';
     border-top: 2px solid #e5e7eb;
 }
 
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow: auto;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modal-md {
+    max-width: 700px;
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: #6b7280;
+    padding: 0;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-close:hover {
+    color: #111827;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.info-box {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: 1rem;
+    font-size: 0.875rem;
+    color: #1e40af;
+}
+
 @media print {
     .page-header .page-actions,
     .filter-form,
@@ -469,24 +580,62 @@ function exportToCSV() {
     link.click();
 }
 
-function printOrders() {
-    window.print();
+function showBulkExport() {
+    // Generate the export data from the current order proposals
+    const table = document.querySelector('#ordersTable table');
+    const dataRows = table.querySelectorAll('tbody tr');
+
+    const exportLines = [];
+    dataRows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length > 1) {
+            const code = cells[1].textContent.trim(); // Item code
+            const recommendedQty = cells[7].textContent.trim().split('\n')[0].replace(/\s+/g, ''); // Recommended quantity
+            exportLines.push(`${code} ${recommendedQty}`);
+        }
+    });
+
+    document.getElementById('bulkExportTextarea').value = exportLines.join('\n');
+    document.getElementById('bulkExportModal').classList.add('active');
 }
+
+function closeBulkExportModal() {
+    document.getElementById('bulkExportModal').classList.remove('active');
+}
+
+function copyBulkExport() {
+    const textarea = document.getElementById('bulkExportTextarea');
+    textarea.select();
+    document.execCommand('copy');
+
+    // Visual feedback
+    const btn = event.target;
+    const originalText = btn.textContent;
+    btn.textContent = '✓ Zkopírováno!';
+    btn.classList.add('btn-success');
+    btn.classList.remove('btn-primary');
+
+    setTimeout(() => {
+        btn.textContent = originalText;
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-primary');
+    }, 2000);
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeBulkExportModal();
+    }
+});
+
+// Close modal on outside click
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('bulkExportModal');
+    if (e.target === modal) {
+        closeBulkExportModal();
+    }
+});
 </script>
 
 <?php require __DIR__ . '/../../includes/footer.php'; ?>
-
-<?php
-} catch (Exception $e) {
-    echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Debug Error</title></head><body>';
-    echo '<h1>Error in Orders Page</h1>';
-    echo '<pre style="background: #fee; padding: 20px; border: 2px solid red;">';
-    echo '<strong>Error Message:</strong> ' . htmlspecialchars($e->getMessage()) . "\n\n";
-    echo '<strong>File:</strong> ' . htmlspecialchars($e->getFile()) . "\n";
-    echo '<strong>Line:</strong> ' . $e->getLine() . "\n\n";
-    echo '<strong>Stack Trace:</strong>' . "\n" . htmlspecialchars($e->getTraceAsString());
-    echo '</pre>';
-    echo '</body></html>';
-    error_log("Orders page error: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
-}
-?>
