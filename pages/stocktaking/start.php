@@ -141,9 +141,13 @@ $locations = $stmt->fetchAll();
 $stmt = $db->prepare("
     SELECT
         COUNT(DISTINCT i.id) as total_items,
-        COUNT(DISTINCT CASE WHEN COALESCE(SUM(s.quantity), 0) > 0 THEN i.id END) as items_with_stock
+        COUNT(DISTINCT CASE WHEN stock_qty > 0 THEN item_id END) as items_with_stock
     FROM items i
-    LEFT JOIN stock s ON i.id = s.item_id
+    LEFT JOIN (
+        SELECT item_id, SUM(quantity) as stock_qty
+        FROM stock
+        GROUP BY item_id
+    ) s ON i.id = s.item_id
     WHERE i.company_id = ? AND i.is_active = 1
 ");
 $stmt->execute([getCurrentCompanyId()]);
