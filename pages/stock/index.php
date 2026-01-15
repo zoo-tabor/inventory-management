@@ -28,7 +28,7 @@ $stmt->execute([getCurrentCompanyId()]);
 $locations = $stmt->fetchAll();
 
 // Build WHERE clause
-$whereClauses = ['i.company_id = ?'];
+$whereClauses = ['i.company_id = ?', 'i.is_active = 1'];
 $params = [getCurrentCompanyId()];
 
 if (!empty($search)) {
