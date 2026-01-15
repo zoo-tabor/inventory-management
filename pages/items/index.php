@@ -24,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $name = sanitize($_POST['name'] ?? '');
             $code = sanitize($_POST['code'] ?? '');
             $categoryId = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
+            $locationId = !empty($_POST['location_id']) ? (int)$_POST['location_id'] : null;
             $description = sanitize($_POST['description'] ?? '');
             $unit = sanitize($_POST['unit'] ?? 'ks');
             $piecesPerPackage = !empty($_POST['pieces_per_package']) ? (int)$_POST['pieces_per_package'] : 1;
@@ -44,12 +45,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     setFlash('error', 'Kód položky již existuje.');
                 } else {
                     $stmt = $db->prepare("
-                        INSERT INTO items (company_id, category_id, name, code, description, unit, pieces_per_package, minimum_stock, optimal_stock, price, is_active)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO items (company_id, category_id, location_id, name, code, description, unit, pieces_per_package, minimum_stock, optimal_stock, price, is_active)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ");
                     $stmt->execute([
                         getCurrentCompanyId(),
                         $categoryId,
+                        $locationId,
                         $name,
                         $code,
                         $description,
@@ -72,6 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $name = sanitize($_POST['name'] ?? '');
             $code = sanitize($_POST['code'] ?? '');
             $categoryId = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
+            $locationId = !empty($_POST['location_id']) ? (int)$_POST['location_id'] : null;
             $description = sanitize($_POST['description'] ?? '');
             $unit = sanitize($_POST['unit'] ?? 'ks');
             $piecesPerPackage = !empty($_POST['pieces_per_package']) ? (int)$_POST['pieces_per_package'] : 1;
@@ -93,10 +96,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     $stmt = $db->prepare("
                         UPDATE items
-                        SET category_id = ?, name = ?, code = ?, description = ?, unit = ?, pieces_per_package = ?, minimum_stock = ?, optimal_stock = ?, price = ?, is_active = ?
+                        SET category_id = ?, location_id = ?, name = ?, code = ?, description = ?, unit = ?, pieces_per_package = ?, minimum_stock = ?, optimal_stock = ?, price = ?, is_active = ?
                         WHERE id = ? AND company_id = ?
                     ");
-                    $stmt->execute([$categoryId, $name, $code, $description, $unit, $piecesPerPackage, $minimumStock, $optimalStock, $price, $isActive, $id, getCurrentCompanyId()]);
+                    $stmt->execute([$categoryId, $locationId, $name, $code, $description, $unit, $piecesPerPackage, $minimumStock, $optimalStock, $price, $isActive, $id, getCurrentCompanyId()]);
 
                     logAudit('update', 'item', $id, "Upravena položka: $name");
                     setFlash('success', 'Položka byla úspěšně upravena.');
@@ -207,10 +210,21 @@ try {
     $stmt->execute([getCurrentCompanyId()]);
     $categories = $stmt->fetchAll();
 
+    // Get locations
+    $stmt = $db->prepare("
+        SELECT id, name, code
+        FROM locations
+        WHERE company_id = ? AND is_active = 1
+        ORDER BY name
+    ");
+    $stmt->execute([getCurrentCompanyId()]);
+    $locations = $stmt->fetchAll();
+
 } catch (Exception $e) {
     error_log("Items fetch error: " . $e->getMessage());
     $items = [];
     $categories = [];
+    $locations = [];
     $totalItems = 0;
     $totalPages = 0;
 }
@@ -383,14 +397,26 @@ include __DIR__ . '/../../includes/header.php';
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="category_id">Kategorie</label>
-                    <select id="category_id" name="category_id" class="form-control">
-                        <option value="">— Bez kategorie —</option>
-                        <?php foreach ($categories as $cat): ?>
-                            <option value="<?= $cat['id'] ?>"><?= e($cat['name']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="category_id">Kategorie</label>
+                        <select id="category_id" name="category_id" class="form-control">
+                            <option value="">— Bez kategorie —</option>
+                            <?php foreach ($categories as $cat): ?>
+                                <option value="<?= $cat['id'] ?>"><?= e($cat['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="location_id">Výchozí sklad</label>
+                        <select id="location_id" name="location_id" class="form-control">
+                            <option value="">— Bez výchozího skladu —</option>
+                            <?php foreach ($locations as $loc): ?>
+                                <option value="<?= $loc['id'] ?>"><?= e($loc['name']) ?> (<?= e($loc['code']) ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -580,6 +606,7 @@ function openCreateModal() {
     document.getElementById('name').value = '';
     document.getElementById('code').value = '';
     document.getElementById('category_id').value = '';
+    document.getElementById('location_id').value = '';
     document.getElementById('description').value = '';
     document.getElementById('unit').value = 'ks';
     document.getElementById('pieces_per_package').value = '1';
@@ -597,6 +624,7 @@ function openEditModal(item) {
     document.getElementById('name').value = item.name;
     document.getElementById('code').value = item.code;
     document.getElementById('category_id').value = item.category_id || '';
+    document.getElementById('location_id').value = item.location_id || '';
     document.getElementById('description').value = item.description || '';
     document.getElementById('unit').value = item.unit;
     document.getElementById('pieces_per_package').value = item.pieces_per_package;
