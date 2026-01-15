@@ -298,11 +298,11 @@ include __DIR__ . '/../../includes/header.php';
                     <tr>
                         <th>Kód</th>
                         <th>Název</th>
-                        <th>Kategorie</th>
-                        <th>Jednotka</th>
                         <th>ks/balení</th>
                         <th class="text-right">Min. stav</th>
+                        <th class="text-right">Optimální stav</th>
                         <th class="text-right">Skladem</th>
+                        <th class="text-right">Cena</th>
                         <th class="text-center">Stav</th>
                         <th class="text-right">Akce</th>
                     </tr>
@@ -314,15 +314,24 @@ include __DIR__ . '/../../includes/header.php';
                         ?>
                         <tr>
                             <td><code><?= e($item['code']) ?></code></td>
-                            <td><strong><?= e($item['name']) ?></strong></td>
-                            <td><?= $item['category_name'] ? e($item['category_name']) : '—' ?></td>
-                            <td><?= e($item['unit']) ?></td>
-                            <td><?= $item['pieces_per_package'] ?></td>
+                            <td>
+                                <strong><?= e($item['name']) ?></strong>
+                                <?php if ($item['category_name']): ?>
+                                    <br><small class="text-muted"><?= e($item['category_name']) ?></small>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= $item['pieces_per_package'] ?> <?= e($item['unit']) ?></td>
                             <td class="text-right"><?= formatNumber($item['minimum_stock']) ?></td>
+                            <td class="text-right">
+                                <?= $item['optimal_stock'] ? formatNumber($item['optimal_stock']) : '—' ?>
+                            </td>
                             <td class="text-right">
                                 <span class="badge badge-<?= $stockStatus ?>">
                                     <?= formatNumber($item['total_stock'] ?? 0) ?>
                                 </span>
+                            </td>
+                            <td class="text-right">
+                                <?= $item['price'] ? formatNumber($item['price'], 2) . ' Kč' : '—' ?>
                             </td>
                             <td class="text-center">
                                 <?php if ($item['is_active']): ?>
