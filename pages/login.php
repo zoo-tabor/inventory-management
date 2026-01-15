@@ -37,7 +37,7 @@ $flashMessages = getFlash();
     <title>Přihlášení - <?= e(APP_NAME) ?></title>
     <link rel="stylesheet" href="/assets/css/style.css">
 </head>
-<body class="login-page">
+<body class="login-page theme-ekospol">
     <div class="login-container">
         <div class="login-box">
             <!-- Logo -->

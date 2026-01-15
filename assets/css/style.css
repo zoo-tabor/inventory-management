@@ -18,7 +18,6 @@
     --gray-100: #f3f4f6;
     --gray-200: #e5e7eb;
     --gray-300: #d1d5db;
-    --gray-400: #9ca3af;
     --gray-500: #6b7280;
     --gray-700: #374151;
     --gray-900: #111827;
@@ -277,7 +276,7 @@ label {
     font-weight: 500;
     color: var(--text-primary);
     background: var(--gray-100);
-    border: 2px solid var(--gray-300);
+    border: 2px solid transparent;
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: all 0.15s ease-in-out;
@@ -285,28 +284,12 @@ label {
 
 .company-btn:hover {
     background: var(--gray-200);
-    border-color: var(--gray-400);
 }
 
 .company-btn.active {
     color: white;
     background: var(--primary);
     border-color: var(--primary);
-}
-
-/* Login page theme overrides */
-.login-page.theme-ekospol {
-    --primary: #1a3d2e;
-    --primary-dark: #0f261c;
-    --bg: #f8f5f2;
-    --bg-alt: #f0ebe6;
-}
-
-.login-page.theme-zoo {
-    --primary: #e86a1e;
-    --primary-dark: #c45a18;
-    --bg: #fffaf6;
-    --bg-alt: #fff3eb;
 }
 
 /* ============================================
