@@ -248,9 +248,9 @@ require __DIR__ . '/../../includes/header.php';
                             <th>Název položky</th>
                             <th>Sklad</th>
                             <th>Očekávaný stav</th>
-                            <th>Napočítáno</th>
+                            <th>Kusy</th>
+                            <th>Balení</th>
                             <th>Rozdíl</th>
-                            <th>Poznámka</th>
                             <th>Akce</th>
                         </tr>
                     </thead>
@@ -286,38 +286,63 @@ require __DIR__ . '/../../includes/header.php';
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <?php if ($isCounted): ?>
-                                        <strong><?= formatNumber($item['counted_quantity']) ?></strong> <?= e($item['item_unit']) ?>
-                                        <br>
-                                        <small class="text-muted"><?= formatDateTime($item['counted_at']) ?></small>
+                                    <input
+                                        type="number"
+                                        class="inline-input"
+                                        data-item-id="<?= $item['id'] ?>"
+                                        data-type="pieces"
+                                        min="0"
+                                        step="1"
+                                        value="<?= $isCounted ? $item['counted_quantity'] : '' ?>"
+                                        placeholder="0"
+                                    >
+                                </td>
+                                <td>
+                                    <?php if ($item['pieces_per_package'] > 1): ?>
+                                        <input
+                                            type="number"
+                                            class="inline-input"
+                                            data-item-id="<?= $item['id'] ?>"
+                                            data-type="packages"
+                                            data-pieces-per-package="<?= $item['pieces_per_package'] ?>"
+                                            min="0"
+                                            step="0.01"
+                                            value=""
+                                            placeholder="0"
+                                        >
                                     <?php else: ?>
-                                        <span class="text-muted">Nespočteno</span>
+                                        <span class="text-muted">-</span>
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <?php if ($isCounted): ?>
-                                        <?php if ($difference > 0): ?>
-                                            <span class="badge badge-success">+<?= formatNumber($difference) ?></span>
-                                        <?php elseif ($difference < 0): ?>
-                                            <span class="badge badge-danger"><?= formatNumber($difference) ?></span>
+                                    <span class="difference-badge" id="diff-<?= $item['id'] ?>">
+                                        <?php if ($isCounted): ?>
+                                            <?php if ($difference > 0): ?>
+                                                <span class="badge badge-success">+<?= formatNumber($difference) ?></span>
+                                            <?php elseif ($difference < 0): ?>
+                                                <span class="badge badge-danger"><?= formatNumber($difference) ?></span>
+                                            <?php else: ?>
+                                                <span class="badge badge-secondary">0</span>
+                                            <?php endif; ?>
                                         <?php else: ?>
-                                            <span class="badge badge-secondary">0</span>
+                                            <span class="text-muted">-</span>
                                         <?php endif; ?>
-                                    <?php else: ?>
-                                        <span class="text-muted">-</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <?php if ($item['note']): ?>
-                                        <small><?= e($item['note']) ?></small>
-                                    <?php else: ?>
-                                        <span class="text-muted">-</span>
-                                    <?php endif; ?>
+                                    </span>
                                 </td>
                                 <td>
                                     <button
                                         type="button"
-                                        class="btn btn-xs btn-primary"
+                                        class="btn btn-xs btn-success save-btn"
+                                        data-item-id="<?= $item['id'] ?>"
+                                        data-location-id="<?= $item['location_id'] ?>"
+                                        onclick="saveCount(<?= $item['id'] ?>)"
+                                        title="Uložit"
+                                    >
+                                        ✓
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="btn btn-xs btn-secondary"
                                         onclick="openCountModal(<?= htmlspecialchars(json_encode([
                                             'id' => $item['id'],
                                             'item_id' => $item['item_id'],
@@ -545,10 +570,164 @@ require __DIR__ . '/../../includes/header.php';
     padding: 0.25rem 0.5rem;
     font-size: 0.875rem;
 }
+
+.inline-input {
+    width: 80px;
+    padding: 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    text-align: center;
+    border: 2px solid #e5e7eb;
+    border-radius: 4px;
+}
+
+.inline-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+}
+
+.save-btn {
+    margin-right: 0.25rem;
+}
 </style>
 
 <script>
 let currentItem = null;
+
+// Handle inline input changes and arrow key navigation
+document.addEventListener('DOMContentLoaded', function() {
+    const inputs = document.querySelectorAll('.inline-input');
+
+    inputs.forEach((input, index) => {
+        // Update difference on input
+        input.addEventListener('input', function() {
+            updateInlineDifference(this);
+        });
+
+        // Arrow key navigation
+        input.addEventListener('keydown', function(e) {
+            const currentRow = this.closest('tr');
+            let targetInput = null;
+
+            if (e.key === 'ArrowDown' || (e.key === 'Enter' && !e.shiftKey)) {
+                e.preventDefault();
+                const nextRow = currentRow.nextElementSibling;
+                if (nextRow) {
+                    targetInput = nextRow.querySelector('.inline-input[data-type="' + this.dataset.type + '"]');
+                }
+            } else if (e.key === 'ArrowUp' || (e.key === 'Enter' && e.shiftKey)) {
+                e.preventDefault();
+                const prevRow = currentRow.previousElementSibling;
+                if (prevRow) {
+                    targetInput = prevRow.querySelector('.inline-input[data-type="' + this.dataset.type + '"]');
+                }
+            } else if (e.key === 'ArrowRight') {
+                const allRowInputs = currentRow.querySelectorAll('.inline-input');
+                const currentIndex = Array.from(allRowInputs).indexOf(this);
+                if (currentIndex < allRowInputs.length - 1) {
+                    targetInput = allRowInputs[currentIndex + 1];
+                }
+            } else if (e.key === 'ArrowLeft') {
+                const allRowInputs = currentRow.querySelectorAll('.inline-input');
+                const currentIndex = Array.from(allRowInputs).indexOf(this);
+                if (currentIndex > 0) {
+                    targetInput = allRowInputs[currentIndex - 1];
+                }
+            }
+
+            if (targetInput) {
+                targetInput.focus();
+                targetInput.select();
+            }
+        });
+
+        // Auto-save on blur
+        input.addEventListener('blur', function() {
+            if (this.value !== '' && this.value !== '0') {
+                const itemId = this.dataset.itemId;
+                saveCount(itemId);
+            }
+        });
+    });
+});
+
+function updateInlineDifference(input) {
+    const itemId = input.dataset.itemId;
+    const row = input.closest('tr');
+    const piecesInput = row.querySelector('.inline-input[data-type="pieces"]');
+    const packagesInput = row.querySelector('.inline-input[data-type="packages"]');
+
+    let totalPieces = 0;
+
+    if (input.dataset.type === 'pieces') {
+        totalPieces = parseInt(piecesInput.value) || 0;
+        // Clear packages input when entering pieces directly
+        if (packagesInput && piecesInput.value) {
+            packagesInput.value = '';
+        }
+    } else if (input.dataset.type === 'packages') {
+        const piecesPerPackage = parseInt(input.dataset.piecesPerPackage) || 1;
+        const packages = parseFloat(packagesInput.value) || 0;
+        totalPieces = Math.round(packages * piecesPerPackage);
+        // Update pieces input to show calculated value
+        if (piecesInput) {
+            piecesInput.value = totalPieces;
+        }
+    }
+
+    // Update difference badge (would need expected quantity from data attribute)
+    // For now, we'll update it when saving
+}
+
+function saveCount(itemId) {
+    const row = document.querySelector(`input[data-item-id="${itemId}"]`).closest('tr');
+    const piecesInput = row.querySelector('.inline-input[data-type="pieces"]');
+    const saveBtn = row.querySelector('.save-btn');
+    const locationId = saveBtn.dataset.locationId;
+
+    const countedQuantity = parseInt(piecesInput.value) || 0;
+
+    if (countedQuantity === 0) {
+        return; // Don't save zero values
+    }
+
+    // Send AJAX request
+    const formData = new FormData();
+    formData.append('stocktaking_item_id', itemId);
+    formData.append('counted_quantity', countedQuantity);
+    formData.append('location_id', locationId);
+    formData.append('note', '');
+    formData.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            // Visual feedback
+            saveBtn.textContent = '✓';
+            saveBtn.classList.remove('btn-success');
+            saveBtn.classList.add('btn-secondary');
+            setTimeout(() => {
+                saveBtn.textContent = '✓';
+                saveBtn.classList.remove('btn-secondary');
+                saveBtn.classList.add('btn-success');
+            }, 500);
+
+            // Reload to update statistics
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        }
+    })
+    .catch(error => {
+        console.error('Error saving count:', error);
+        alert('Chyba při ukládání');
+    });
+}
+
 
 function openCountModal(itemData) {
     currentItem = itemData;
