@@ -4,6 +4,13 @@
  * Automatically suggest items to order based on stock levels
  */
 
+// Enable error display for debugging
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+try {
+
 if (!isLoggedIn()) {
     redirect('/login');
 }
@@ -468,3 +475,18 @@ function printOrders() {
 </script>
 
 <?php require __DIR__ . '/../../includes/footer.php'; ?>
+
+<?php
+} catch (Exception $e) {
+    echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Debug Error</title></head><body>';
+    echo '<h1>Error in Orders Page</h1>';
+    echo '<pre style="background: #fee; padding: 20px; border: 2px solid red;">';
+    echo '<strong>Error Message:</strong> ' . htmlspecialchars($e->getMessage()) . "\n\n";
+    echo '<strong>File:</strong> ' . htmlspecialchars($e->getFile()) . "\n";
+    echo '<strong>Line:</strong> ' . $e->getLine() . "\n\n";
+    echo '<strong>Stack Trace:</strong>' . "\n" . htmlspecialchars($e->getTraceAsString());
+    echo '</pre>';
+    echo '</body></html>';
+    error_log("Orders page error: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
+}
+?>
