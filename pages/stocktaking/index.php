@@ -78,23 +78,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $_SESSION['user_id']
                     ]);
 
-                    // Update stock
+                    // Update stock - use INSERT ON DUPLICATE KEY UPDATE to handle both new and existing records
                     if ($difference > 0) {
                         // Add to stock
                         $stmt = $db->prepare("
-                            UPDATE stock
-                            SET quantity = quantity + ?
-                            WHERE item_id = ? AND location_id = ?
+                            INSERT INTO stock (item_id, location_id, company_id, quantity)
+                            VALUES (?, ?, ?, ?)
+                            ON DUPLICATE KEY UPDATE quantity = quantity + ?
                         ");
-                        $stmt->execute([$quantity, $item['item_id'], $locationId]);
+                        $stmt->execute([$item['item_id'], $locationId, getCurrentCompanyId(), $quantity, $quantity]);
                     } else {
                         // Subtract from stock
                         $stmt = $db->prepare("
-                            UPDATE stock
-                            SET quantity = quantity - ?
-                            WHERE item_id = ? AND location_id = ?
+                            INSERT INTO stock (item_id, location_id, company_id, quantity)
+                            VALUES (?, ?, ?, 0)
+                            ON DUPLICATE KEY UPDATE quantity = quantity - ?
                         ");
-                        $stmt->execute([$quantity, $item['item_id'], $locationId]);
+                        $stmt->execute([$item['item_id'], $locationId, getCurrentCompanyId(), $quantity]);
                     }
                 }
             }
