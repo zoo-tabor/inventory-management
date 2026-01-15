@@ -233,10 +233,21 @@ require __DIR__ . '/../../includes/header.php';
                 <!-- Employee Selection -->
                 <div class="form-group">
                     <label for="employee_id">Zaměstnanec</label>
-                    <select name="employee_id" id="employee_id" class="form-control">
+                    <input
+                        type="text"
+                        id="employee_search"
+                        class="form-control"
+                        placeholder="Začněte psát jméno zaměstnance..."
+                        autocomplete="off"
+                    >
+                    <select name="employee_id" id="employee_id" class="form-control" style="display: none;">
                         <option value="">-- Vyberte zaměstnance --</option>
                         <?php foreach ($employees as $employee): ?>
-                            <option value="<?= $employee['id'] ?>">
+                            <option
+                                value="<?= $employee['id'] ?>"
+                                data-department-id="<?= $employee['department_id'] ?>"
+                                data-search-text="<?= e(strtolower($employee['full_name'] . ' ' . ($employee['department_name'] ?? ''))) ?>"
+                            >
                                 <?= e($employee['full_name']) ?>
                                 <?php if ($employee['department_name']): ?>
                                     - <?= e($employee['department_name']) ?>
@@ -244,13 +255,14 @@ require __DIR__ . '/../../includes/header.php';
                             </option>
                         <?php endforeach; ?>
                     </select>
+                    <div id="employee_dropdown" class="search-dropdown" style="display: none;"></div>
                     <small class="form-text">Volitelné - komu byl výdej předán</small>
                 </div>
 
                 <!-- Department Selection -->
                 <div class="form-group">
                     <label for="department_id">Oddělení</label>
-                    <select name="department_id" id="department_id" class="form-control">
+                    <select name="department_id" id="department_id" class="form-control" disabled>
                         <option value="">-- Vyberte oddělení --</option>
                         <?php foreach ($departments as $department): ?>
                             <option value="<?= $department['id'] ?>">
@@ -258,7 +270,7 @@ require __DIR__ . '/../../includes/header.php';
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <small class="form-text">Volitelné - pro které oddělení</small>
+                    <small class="form-text">Automaticky vyplněno dle zaměstnance</small>
                 </div>
 
                 <!-- Movement Date -->
@@ -398,12 +410,51 @@ require __DIR__ . '/../../includes/header.php';
     padding-top: 1rem;
     border-top: 1px solid #e5e7eb;
 }
+
+.search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.search-dropdown-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.search-dropdown-item:hover {
+    background: #f9fafb;
+}
+
+.search-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.search-dropdown-item.selected {
+    background: #e0f2fe;
+}
+
+.form-group {
+    position: relative;
+}
 </style>
 
 <script>
 const stockData = <?= json_encode($stockData) ?>;
 let selectedItem = null;
 let selectedLocation = null;
+let selectedEmployeeIndex = -1;
+let filteredEmployees = [];
 
 function handleItemChange() {
     const select = document.getElementById('item_id');
@@ -534,6 +585,122 @@ function formatNumber(num, decimals = 0) {
 if (document.getElementById('item_id').value) {
     handleItemChange();
 }
+
+// Employee search functionality
+const employeeSearchInput = document.getElementById('employee_search');
+const employeeSelect = document.getElementById('employee_id');
+const employeeDropdown = document.getElementById('employee_dropdown');
+const departmentSelect = document.getElementById('department_id');
+
+employeeSearchInput.addEventListener('input', function(e) {
+    const searchText = e.target.value.toLowerCase().trim();
+
+    if (searchText === '') {
+        employeeDropdown.style.display = 'none';
+        employeeSelect.value = '';
+        departmentSelect.value = '';
+        selectedEmployeeIndex = -1;
+        return;
+    }
+
+    // Filter employees
+    filteredEmployees = [];
+    const options = employeeSelect.querySelectorAll('option');
+
+    options.forEach((option, index) => {
+        if (index === 0) return; // Skip the placeholder
+        const optionSearchText = option.getAttribute('data-search-text');
+        if (optionSearchText && optionSearchText.includes(searchText)) {
+            filteredEmployees.push({
+                value: option.value,
+                text: option.textContent.trim(),
+                departmentId: option.getAttribute('data-department-id'),
+                element: option
+            });
+        }
+    });
+
+    // Display filtered results
+    if (filteredEmployees.length > 0) {
+        let html = '';
+        filteredEmployees.forEach((emp, index) => {
+            html += `<div class="search-dropdown-item" data-index="${index}">${emp.text}</div>`;
+        });
+        employeeDropdown.innerHTML = html;
+        employeeDropdown.style.display = 'block';
+        selectedEmployeeIndex = -1;
+    } else {
+        employeeDropdown.innerHTML = '<div class="search-dropdown-item" style="color: #999;">Žádný zaměstnanec nenalezen</div>';
+        employeeDropdown.style.display = 'block';
+    }
+});
+
+employeeSearchInput.addEventListener('keydown', function(e) {
+    const items = employeeDropdown.querySelectorAll('.search-dropdown-item');
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (selectedEmployeeIndex < filteredEmployees.length - 1) {
+            selectedEmployeeIndex++;
+            updateSelectedItem(items);
+        }
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (selectedEmployeeIndex > 0) {
+            selectedEmployeeIndex--;
+            updateSelectedItem(items);
+        }
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (selectedEmployeeIndex >= 0 && filteredEmployees[selectedEmployeeIndex]) {
+            selectEmployee(filteredEmployees[selectedEmployeeIndex]);
+        }
+    } else if (e.key === 'Escape') {
+        employeeDropdown.style.display = 'none';
+        selectedEmployeeIndex = -1;
+    }
+});
+
+function updateSelectedItem(items) {
+    items.forEach((item, index) => {
+        if (index === selectedEmployeeIndex) {
+            item.classList.add('selected');
+            item.scrollIntoView({ block: 'nearest' });
+        } else {
+            item.classList.remove('selected');
+        }
+    });
+}
+
+employeeDropdown.addEventListener('click', function(e) {
+    const item = e.target.closest('.search-dropdown-item');
+    if (item && item.hasAttribute('data-index')) {
+        const index = parseInt(item.getAttribute('data-index'));
+        selectEmployee(filteredEmployees[index]);
+    }
+});
+
+function selectEmployee(employee) {
+    employeeSelect.value = employee.value;
+    employeeSearchInput.value = employee.text;
+    employeeDropdown.style.display = 'none';
+    selectedEmployeeIndex = -1;
+
+    // Auto-populate department
+    if (employee.departmentId) {
+        departmentSelect.value = employee.departmentId;
+    } else {
+        departmentSelect.value = '';
+    }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    if (!employeeSearchInput.contains(e.target) && !employeeDropdown.contains(e.target)) {
+        employeeDropdown.style.display = 'none';
+        selectedEmployeeIndex = -1;
+    }
+});
 </script>
 
 <?php require __DIR__ . '/../../includes/footer.php'; ?>
