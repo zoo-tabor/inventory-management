@@ -145,11 +145,23 @@ a:hover {
 .login-logo {
     text-align: center;
     margin-bottom: var(--spacing-lg);
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .company-logo {
-    max-width: 200px;
+    max-width: 300px;
     height: auto;
+}
+
+#logo-ekospol {
+    height: 51px;
+}
+
+#logo-zoo {
+    height: 100px;
 }
 
 .login-box h1 {

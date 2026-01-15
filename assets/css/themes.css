@@ -56,13 +56,29 @@
 .header-logo {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--spacing-md);
+    min-width: 400px;
+}
+
+.header-logo img {
+    flex-shrink: 0;
+}
+
+.theme-ekospol .header-logo img {
+    height: 34px;
+    width: 200px;
+}
+
+.theme-zoo .header-logo img {
+    height: 67px;
+    width: 127px;
 }
 
 .app-title {
     font-size: 1.125rem;
     font-weight: 600;
     color: var(--primary);
+    white-space: nowrap;
 }
 
 /* Company Switcher */

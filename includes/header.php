@@ -28,7 +28,7 @@ $themeClass = getThemeClass();
             <div class="header-left">
                 <!-- Logo -->
                 <div class="header-logo">
-                    <img src="/assets/img/<?= e($currentCompany['logo']) ?>" alt="<?= e($currentCompany['name']) ?>" height="40">
+                    <img src="/assets/img/<?= e($currentCompany['logo']) ?>" alt="<?= e($currentCompany['name']) ?>">
                     <span class="app-title"><?= e(APP_NAME) ?></span>
                 </div>
             </div>
