@@ -65,8 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ");
             $params = [$locationId, $locationId, ...$params];
             $stmt->execute($params);
+            $items = $stmt->fetchAll();
         } else {
-            // All locations - create separate entries for each location
+            // All locations - get items with stock in any location
             $stmt = $db->prepare("
                 SELECT
                     i.id as item_id,
@@ -74,13 +75,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     s.quantity as current_stock
                 FROM items i
                 INNER JOIN stock s ON i.id = s.item_id
-                WHERE $whereSQL AND s.quantity > 0
+                WHERE $whereSQL
+                " . ($includeZeroStock ? "" : "AND s.quantity > 0") . "
                 ORDER BY i.name, s.location_id
             ");
             $stmt->execute($params);
-        }
+            $items = $stmt->fetchAll();
 
-        $items = $stmt->fetchAll();
+            // If including zero stock, also add items that have no stock entries at all
+            if ($includeZeroStock) {
+                $stmt = $db->prepare("
+                    SELECT
+                        i.id as item_id,
+                        NULL as location_id,
+                        0 as current_stock
+                    FROM items i
+                    WHERE $whereSQL
+                    AND NOT EXISTS (SELECT 1 FROM stock s WHERE s.item_id = i.id)
+                    ORDER BY i.name
+                ");
+                $stmt->execute($params);
+                $itemsWithoutStock = $stmt->fetchAll();
+                $items = array_merge($items, $itemsWithoutStock);
+            }
+        }
 
         // Insert stocktaking items
         $insertStmt = $db->prepare("
