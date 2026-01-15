@@ -79,7 +79,7 @@ $stmt = $db->prepare("
     WHERE i.company_id = ? AND i.is_active = 1
     " . ($itemId > 0 ? "AND i.id = ?" : "") . "
     " . ($categoryFilter > 0 ? "AND i.category_id = ?" : "") . "
-    GROUP BY i.id
+    GROUP BY i.id, i.name, i.code, i.unit, i.minimum_stock, c.name
     HAVING total_receipts > 0 OR total_issues > 0
     ORDER BY (total_receipts + total_issues) DESC, i.name
 ");
@@ -128,7 +128,6 @@ if ($itemId > 0) {
                 sm.*,
                 l.name as location_name,
                 e.full_name as employee_name,
-                
                 d.name as department_name,
                 u.full_name as user_name
             FROM stock_movements sm
