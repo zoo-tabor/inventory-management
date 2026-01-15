@@ -142,9 +142,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Preserve filter parameters when redirecting
     $redirectParams = [];
-    if (!empty($_POST['filter_search'])) $redirectParams['search'] = $_POST['filter_search'];
-    if (!empty($_POST['filter_category'])) $redirectParams['category'] = $_POST['filter_category'];
-    if (!empty($_POST['filter_status'])) $redirectParams['status'] = $_POST['filter_status'];
+    if (isset($_POST['filter_search']) && $_POST['filter_search'] !== '') {
+        $redirectParams['search'] = $_POST['filter_search'];
+    }
+    if (isset($_POST['filter_category']) && $_POST['filter_category'] !== '') {
+        $redirectParams['category'] = $_POST['filter_category'];
+    }
+    if (isset($_POST['filter_status']) && $_POST['filter_status'] !== '') {
+        $redirectParams['status'] = $_POST['filter_status'];
+    }
 
     redirect('items', $redirectParams);
 }
