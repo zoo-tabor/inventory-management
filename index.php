@@ -2,6 +2,7 @@
 /**
  * Main Router
  * Skladový systém
+ * Updated: 2026-01-15
  */
 
 // Enable error logging to file
