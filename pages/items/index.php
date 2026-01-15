@@ -140,7 +140,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setFlash('error', 'Došlo k chybě při zpracování požadavku.');
     }
 
-    redirect('items');
+    // Preserve filter parameters when redirecting
+    $redirectParams = [];
+    if (!empty($_GET['search'])) $redirectParams['search'] = $_GET['search'];
+    if (!empty($_GET['category'])) $redirectParams['category'] = $_GET['category'];
+    if (!empty($_GET['status'])) $redirectParams['status'] = $_GET['status'];
+
+    redirect('items', $redirectParams);
 }
 
 // Pagination
