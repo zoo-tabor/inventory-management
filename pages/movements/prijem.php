@@ -23,7 +23,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $itemId = (int)$_POST['item_id'];
     $locationId = (int)$_POST['location_id'];
-    $employeeId = (int)($_POST['employee_id'] ?? 0);
     $inputType = sanitize($_POST['input_type']); // 'pieces' or 'packages'
     $inputQuantity = (float)$_POST['quantity'];
     $note = sanitize($_POST['note']);
@@ -58,15 +57,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Insert movement record
         $stmt = $db->prepare("
             INSERT INTO stock_movements (
-                company_id, item_id, location_id, employee_id, user_id,
+                company_id, item_id, location_id, user_id,
                 movement_type, quantity, note, movement_date
-            ) VALUES (?, ?, ?, ?, ?, 'prijem', ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, 'prijem', ?, ?, ?)
         ");
         $stmt->execute([
             getCurrentCompanyId(),
             $itemId,
             $locationId,
-            $employeeId ?: null,
             $_SESSION['user_id'],
             $quantityInPieces,
             $note,
@@ -129,17 +127,6 @@ $stmt = $db->prepare("SELECT * FROM locations WHERE company_id = ? AND is_active
 $stmt->execute([getCurrentCompanyId()]);
 $locations = $stmt->fetchAll();
 
-// Get active employees
-$stmt = $db->prepare("
-    SELECT e.*, d.name as department_name
-    FROM employees e
-    LEFT JOIN departments d ON e.department_id = d.id
-    WHERE e.company_id = ? AND e.is_active = 1
-    ORDER BY e.full_name
-");
-$stmt->execute([getCurrentCompanyId()]);
-$employees = $stmt->fetchAll();
-
 require __DIR__ . '/../../includes/header.php';
 ?>
 
@@ -195,23 +182,6 @@ require __DIR__ . '/../../includes/header.php';
                             </option>
                         <?php endforeach; ?>
                     </select>
-                </div>
-
-                <!-- Employee Selection -->
-                <div class="form-group">
-                    <label for="employee_id">Zaměstnanec</label>
-                    <select name="employee_id" id="employee_id" class="form-control">
-                        <option value="">-- Vyberte zaměstnance --</option>
-                        <?php foreach ($employees as $employee): ?>
-                            <option value="<?= $employee['id'] ?>">
-                                <?= e($employee['full_name']) ?>
-                                <?php if ($employee['department_name']): ?>
-                                    - <?= e($employee['department_name']) ?>
-                                <?php endif; ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <small class="form-text">Volitelné - kdo příjem provedl</small>
                 </div>
 
                 <!-- Movement Date -->
