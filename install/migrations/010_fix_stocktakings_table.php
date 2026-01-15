@@ -37,6 +37,13 @@ return function($db) {
     $hasUserId = $stmt->rowCount() > 0;
 
     if (!$hasUserId) {
+        // First, drop old foreign key on started_by if it exists
+        try {
+            $db->exec("ALTER TABLE `stocktakings` DROP FOREIGN KEY `stocktakings_ibfk_2`");
+        } catch (PDOException $e) {
+            // Foreign key might not exist, that's OK
+        }
+
         // Add user_id column and copy data from started_by
         $db->exec("
             ALTER TABLE `stocktakings`

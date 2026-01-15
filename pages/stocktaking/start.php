@@ -27,13 +27,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Create stocktaking record
         $stmt = $db->prepare("
-            INSERT INTO stocktakings (company_id, location_id, user_id, status)
-            VALUES (?, ?, ?, 'in_progress')
+            INSERT INTO stocktakings (company_id, location_id, user_id, started_by, status)
+            VALUES (?, ?, ?, ?, 'in_progress')
         ");
         $stmt->execute([
             getCurrentCompanyId(),
             $locationId ?: null,
-            $_SESSION['user_id']
+            $_SESSION['user_id'],
+            $_SESSION['user_id']  // Also set started_by for backwards compatibility
         ]);
 
         $stocktakingId = $db->lastInsertId();
@@ -174,9 +175,9 @@ require __DIR__ . '/../../includes/header.php';
                     <?= csrfField() ?>
 
                     <div class="form-group">
-                        <label for="location_id">Sklad</label>
-                        <select name="location_id" id="location_id" class="form-control">
-                            <option value="">Všechny sklady</option>
+                        <label for="location_id">Sklad *</label>
+                        <select name="location_id" id="location_id" class="form-control" required>
+                            <option value="">— Vyberte sklad —</option>
                             <?php foreach ($locations as $location): ?>
                                 <option value="<?= $location['id'] ?>">
                                     <?= e($location['name']) ?> (<?= e($location['code']) ?>)
@@ -184,7 +185,7 @@ require __DIR__ . '/../../includes/header.php';
                             <?php endforeach; ?>
                         </select>
                         <small class="form-text">
-                            Vyberte konkrétní sklad nebo ponechte prázdné pro inventuru všech skladů.
+                            Vyberte sklad, ve kterém bude probíhat inventura.
                         </small>
                     </div>
 
