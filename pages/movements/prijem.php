@@ -110,13 +110,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Get active items
 $stmt = $db->prepare("
-    SELECT i.*, c.name as category_name,
+    SELECT i.id, i.code, i.name, i.unit, i.pieces_per_package, i.minimum_stock,
+           c.name as category_name,
            COALESCE(SUM(s.quantity), 0) as current_stock
     FROM items i
     LEFT JOIN categories c ON i.category_id = c.id
     LEFT JOIN stock s ON i.id = s.item_id
     WHERE i.company_id = ? AND i.is_active = 1
-    GROUP BY i.id
+    GROUP BY i.id, i.code, i.name, i.unit, i.pieces_per_package, i.minimum_stock, c.name
     ORDER BY i.name
 ");
 $stmt->execute([getCurrentCompanyId()]);
