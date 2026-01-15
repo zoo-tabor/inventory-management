@@ -99,7 +99,6 @@ if ($departmentFilter > 0) {
             i.unit as item_unit,
             l.name as location_name,
             e.full_name as employee_name,
-            
             u.full_name as user_name
         FROM stock_movements sm
         INNER JOIN items i ON sm.item_id = i.id
