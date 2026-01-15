@@ -21,7 +21,7 @@ if (!$stocktakingId) {
 // Get stocktaking details
 $stmt = $db->prepare("
     SELECT s.*, l.name as location_name, u.full_name as user_name
-    FROM stocktaking s
+    FROM stocktakings s
     LEFT JOIN locations l ON s.location_id = l.id
     LEFT JOIN users u ON s.user_id = u.id
     WHERE s.id = ? AND s.company_id = ?

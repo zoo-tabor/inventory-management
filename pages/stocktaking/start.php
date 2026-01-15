@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Create stocktaking record
         $stmt = $db->prepare("
-            INSERT INTO stocktaking (company_id, location_id, user_id, status)
+            INSERT INTO stocktakings (company_id, location_id, user_id, status)
             VALUES (?, ?, ?, 'in_progress')
         ");
         $stmt->execute([

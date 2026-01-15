@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = sanitize($_POST['action']);
 
     // Verify ownership
-    $stmt = $db->prepare("SELECT * FROM stocktaking WHERE id = ? AND company_id = ?");
+    $stmt = $db->prepare("SELECT * FROM stocktakings WHERE id = ? AND company_id = ?");
     $stmt->execute([$stocktakingId, getCurrentCompanyId()]);
     $stocktaking = $stmt->fetch();
 
@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             // Update stocktaking status
             $stmt = $db->prepare("
-                UPDATE stocktaking
+                UPDATE stocktakings
                 SET status = 'completed', completed_at = NOW()
                 WHERE id = ?
             ");
@@ -105,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         } elseif ($action === 'cancel') {
             $stmt = $db->prepare("
-                UPDATE stocktaking
+                UPDATE stocktakings
                 SET status = 'cancelled'
                 WHERE id = ?
             ");
@@ -163,7 +163,7 @@ $stmt = $db->prepare("
         (SELECT SUM(ABS(counted_quantity - expected_quantity))
          FROM stocktaking_items
          WHERE stocktaking_id = s.id AND counted_quantity IS NOT NULL) as total_difference
-    FROM stocktaking s
+    FROM stocktakings s
     LEFT JOIN locations l ON s.location_id = l.id
     LEFT JOIN users u ON s.user_id = u.id
     WHERE $whereSQL
