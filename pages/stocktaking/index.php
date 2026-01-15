@@ -48,6 +48,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $difference = $item['counted_quantity'] - $item['expected_quantity'];
 
                 if ($difference != 0) {
+                    // Use location from stocktaking_item (supports multi-location inventories)
+                    $locationId = $item['location_id'];
+
+                    if (!$locationId) {
+                        // Skip items without location
+                        continue;
+                    }
+
                     // Create adjustment movement
                     $movementType = $difference > 0 ? 'prijem' : 'vydej';
                     $quantity = abs($difference);
@@ -61,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $stmt->execute([
                         getCurrentCompanyId(),
                         $item['item_id'],
-                        $stocktaking['location_id'],
+                        $locationId,
                         $_SESSION['user_id'],
                         $movementType,
                         $quantity,
@@ -77,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             SET quantity = quantity + ?
                             WHERE item_id = ? AND location_id = ?
                         ");
-                        $stmt->execute([$quantity, $item['item_id'], $stocktaking['location_id']]);
+                        $stmt->execute([$quantity, $item['item_id'], $locationId]);
                     } else {
                         // Subtract from stock
                         $stmt = $db->prepare("
@@ -85,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             SET quantity = quantity - ?
                             WHERE item_id = ? AND location_id = ?
                         ");
-                        $stmt->execute([$quantity, $item['item_id'], $stocktaking['location_id']]);
+                        $stmt->execute([$quantity, $item['item_id'], $locationId]);
                     }
                 }
             }
