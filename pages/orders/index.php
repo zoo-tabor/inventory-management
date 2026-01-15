@@ -32,6 +32,25 @@ if ($categoryFilter > 0) {
 
 $whereSQL = implode(' AND ', $whereClauses);
 
+// Build ORDER BY clause based on sort parameter
+$orderBySQL = '';
+if ($sortBy === 'priority') {
+    $orderBySQL = "
+        CASE
+            WHEN current_stock <= 0 THEN 1
+            WHEN current_stock <= i.minimum_stock THEN 2
+            ELSE 3
+        END ASC,
+        i.name ASC
+    ";
+} elseif ($sortBy === 'name') {
+    $orderBySQL = "i.name ASC";
+} elseif ($sortBy === 'quantity') {
+    $orderBySQL = "needed_quantity DESC";
+} else {
+    $orderBySQL = "i.name ASC";
+}
+
 // Get items with stock levels
 $stmt = $db->prepare("
     SELECT
@@ -45,16 +64,7 @@ $stmt = $db->prepare("
     WHERE $whereSQL
     GROUP BY i.id
     HAVING current_stock <= i.minimum_stock
-    ORDER BY
-        CASE WHEN '$sortBy' = 'priority' THEN
-            CASE
-                WHEN current_stock <= 0 THEN 1
-                WHEN current_stock <= i.minimum_stock THEN 2
-                ELSE 3
-            END
-        END,
-        CASE WHEN '$sortBy' = 'name' THEN i.name END,
-        CASE WHEN '$sortBy' = 'quantity' THEN needed_quantity END DESC
+    ORDER BY $orderBySQL
 ");
 $stmt->execute($params);
 $allItems = $stmt->fetchAll();
