@@ -80,8 +80,10 @@ $stmt = $db->prepare("
     " . ($itemId > 0 ? "AND i.id = ?" : "") . "
     " . ($categoryFilter > 0 ? "AND i.category_id = ?" : "") . "
     GROUP BY i.id, i.name, i.code, i.unit, i.minimum_stock, c.name
-    HAVING total_receipts > 0 OR total_issues > 0
-    ORDER BY (total_receipts + total_issues) DESC, i.name
+    HAVING COUNT(DISTINCT CASE WHEN sm.movement_type = 'prijem' THEN sm.id END) > 0
+        OR COUNT(DISTINCT CASE WHEN sm.movement_type = 'vydej' THEN sm.id END) > 0
+    ORDER BY (COUNT(DISTINCT CASE WHEN sm.movement_type = 'prijem' THEN sm.id END) +
+              COUNT(DISTINCT CASE WHEN sm.movement_type = 'vydej' THEN sm.id END)) DESC, i.name
 ");
 
 $statsParams = [...$params, getCurrentCompanyId()];
