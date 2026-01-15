@@ -66,7 +66,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setFlash('error', 'Chyba při zaznamenávání: ' . $e->getMessage());
     }
 
-    redirect('stocktaking/count', ['id' => $stocktakingId]);
+    // Don't redirect - just reload the page data to stay on same page
+    header('Location: ' . $_SERVER['REQUEST_URI']);
+    exit;
 }
 
 // Get locations for dropdown
@@ -244,7 +246,6 @@ require __DIR__ . '/../../includes/header.php';
                         <tr>
                             <th>Kód</th>
                             <th>Název položky</th>
-                            <th>Kategorie</th>
                             <th>Sklad</th>
                             <th>Očekávaný stav</th>
                             <th>Napočítáno</th>
@@ -266,7 +267,6 @@ require __DIR__ . '/../../includes/header.php';
                             <tr class="<?= $rowClass ?>" id="row-<?= $item['id'] ?>">
                                 <td><strong><?= e($item['item_code']) ?></strong></td>
                                 <td><?= e($item['item_name']) ?></td>
-                                <td><?= e($item['category_name'] ?? '-') ?></td>
                                 <td>
                                     <?php if ($item['location_name']): ?>
                                         <strong><?= e($item['location_name']) ?></strong>
@@ -317,7 +317,7 @@ require __DIR__ . '/../../includes/header.php';
                                 <td>
                                     <button
                                         type="button"
-                                        class="btn btn-sm btn-primary"
+                                        class="btn btn-xs btn-primary"
                                         onclick="openCountModal(<?= htmlspecialchars(json_encode([
                                             'id' => $item['id'],
                                             'item_id' => $item['item_id'],
@@ -386,17 +386,24 @@ require __DIR__ . '/../../includes/header.php';
                 </div>
 
                 <div class="form-group">
-                    <label for="counted_quantity" class="required">Napočtené množství</label>
-                    <input
-                        type="number"
-                        name="counted_quantity"
-                        id="counted_quantity"
-                        class="form-control form-control-lg"
-                        min="0"
-                        step="1"
-                        required
-                        onchange="calculateDifference()"
-                    >
+                    <label class="required">Napočtené množství</label>
+                    <div class="quantity-input-group">
+                        <input
+                            type="number"
+                            id="quantity_input"
+                            class="form-control form-control-lg"
+                            min="0"
+                            step="0.01"
+                            required
+                            placeholder="0"
+                            onchange="calculateQuantityInPieces()"
+                        >
+                        <select id="unit_selector" class="form-control" onchange="calculateQuantityInPieces()">
+                            <option value="ks">ks</option>
+                            <option value="bal">bal</option>
+                        </select>
+                    </div>
+                    <input type="hidden" name="counted_quantity" id="counted_quantity">
                     <small class="form-text" id="differenceHelper"></small>
                 </div>
 
@@ -517,6 +524,27 @@ require __DIR__ . '/../../includes/header.php';
     padding: 0.75rem 1rem;
     text-align: center;
 }
+
+.quantity-input-group {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 0.5rem;
+}
+
+.quantity-input-group input {
+    text-align: center;
+}
+
+.quantity-input-group select {
+    font-size: 1.25rem;
+    padding: 0.75rem 0.5rem;
+    font-weight: 600;
+}
+
+.btn-xs {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
 </style>
 
 <script>
@@ -535,20 +563,53 @@ function openCountModal(itemData) {
     const locationSelect = document.getElementById('modal_location_id');
     locationSelect.value = itemData.location_id || '';
 
-    const quantityInput = document.getElementById('counted_quantity');
-    quantityInput.value = itemData.counted_quantity !== null ? itemData.counted_quantity : '';
+    // Set quantity - default to ks (pieces)
+    const quantityInput = document.getElementById('quantity_input');
+    const unitSelector = document.getElementById('unit_selector');
+    const hiddenQuantity = document.getElementById('counted_quantity');
+
+    if (itemData.counted_quantity !== null) {
+        quantityInput.value = itemData.counted_quantity;
+        unitSelector.value = 'ks';
+        hiddenQuantity.value = itemData.counted_quantity;
+    } else {
+        quantityInput.value = '';
+        unitSelector.value = 'ks';
+        hiddenQuantity.value = '';
+    }
 
     document.getElementById('modal_note').value = itemData.note || '';
 
     calculateDifference();
 
     document.getElementById('countModal').classList.add('active');
-    setTimeout(() => locationSelect.focus(), 100);
+    setTimeout(() => quantityInput.focus(), 100);
 }
 
 function closeCountModal() {
     document.getElementById('countModal').classList.remove('active');
     currentItem = null;
+}
+
+function calculateQuantityInPieces() {
+    if (!currentItem) return;
+
+    const quantityInput = parseFloat(document.getElementById('quantity_input').value) || 0;
+    const unitSelector = document.getElementById('unit_selector').value;
+    const hiddenQuantity = document.getElementById('counted_quantity');
+
+    let quantityInPieces = 0;
+
+    if (unitSelector === 'bal') {
+        // Convert packages to pieces
+        quantityInPieces = Math.round(quantityInput * currentItem.pieces_per_package);
+    } else {
+        // Already in pieces
+        quantityInPieces = Math.round(quantityInput);
+    }
+
+    hiddenQuantity.value = quantityInPieces;
+    calculateDifference();
 }
 
 function calculateDifference() {
