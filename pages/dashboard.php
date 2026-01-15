@@ -92,7 +92,7 @@ include __DIR__ . '/../includes/header.php';
                 <div class="stat-label">Pohyby (7 dní)</div>
                 <div class="stat-value"><?= formatNumber($recentMovements) ?></div>
             </div>
-            <a href="/movements" class="stat-link">Zobrazit →</a>
+            <a href="<?= url('movements') ?>" class="stat-link">Zobrazit →</a>
         </div>
 
         <div class="stat-card">
@@ -102,7 +102,7 @@ include __DIR__ . '/../includes/header.php';
                 <div class="stat-value"><?= formatNumber($activeStocktakings) ?></div>
             </div>
             <?php if ($activeStocktakings > 0): ?>
-                <a href="/stocktaking" class="stat-link">Zobrazit →</a>
+                <a href="<?= url('stocktaking') ?>" class="stat-link">Zobrazit →</a>
             <?php endif; ?>
         </div>
     </div>
@@ -111,25 +111,25 @@ include __DIR__ . '/../includes/header.php';
     <div class="quick-actions">
         <h2>Rychlé akce</h2>
         <div class="action-grid">
-            <a href="/movements/vydej" class="action-card">
+            <a href="<?= url('movements/vydej') ?>" class="action-card">
                 <span class="action-icon">➖</span>
                 <span class="action-title">Nový výdej</span>
                 <span class="action-desc">Zaznamenat vydání zboží</span>
             </a>
 
-            <a href="/movements/prijem" class="action-card">
+            <a href="<?= url('movements/prijem') ?>" class="action-card">
                 <span class="action-icon">➕</span>
                 <span class="action-title">Nový příjem</span>
                 <span class="action-desc">Zaznamenat příjem zboží</span>
             </a>
 
-            <a href="/stock" class="action-card">
+            <a href="<?= url('stock') ?>" class="action-card">
                 <span class="action-icon">📦</span>
                 <span class="action-title">Přehled skladu</span>
                 <span class="action-desc">Zobrazit aktuální stav</span>
             </a>
 
-            <a href="/stocktaking/start" class="action-card">
+            <a href="<?= url('stocktaking/start') ?>" class="action-card">
                 <span class="action-icon">📋</span>
                 <span class="action-title">Nová inventura</span>
                 <span class="action-desc">Zahájit inventuru skladu</span>
