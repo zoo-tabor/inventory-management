@@ -44,8 +44,8 @@ $orderBySQL = '';
 if ($sortBy === 'priority') {
     $orderBySQL = "
         CASE
-            WHEN current_stock <= 0 THEN 1
-            WHEN current_stock <= i.minimum_stock THEN 2
+            WHEN COALESCE(SUM(s.quantity), 0) <= 0 THEN 1
+            WHEN COALESCE(SUM(s.quantity), 0) <= i.minimum_stock THEN 2
             ELSE 3
         END ASC,
         i.name ASC
@@ -53,7 +53,7 @@ if ($sortBy === 'priority') {
 } elseif ($sortBy === 'name') {
     $orderBySQL = "i.name ASC";
 } elseif ($sortBy === 'quantity') {
-    $orderBySQL = "needed_quantity DESC";
+    $orderBySQL = "(i.optimal_stock - COALESCE(SUM(s.quantity), 0)) DESC";
 } else {
     $orderBySQL = "i.name ASC";
 }
@@ -70,7 +70,7 @@ $stmt = $db->prepare("
     LEFT JOIN stock s ON i.id = s.item_id
     WHERE $whereSQL
     GROUP BY i.id
-    HAVING current_stock <= i.minimum_stock
+    HAVING COALESCE(SUM(s.quantity), 0) <= i.minimum_stock
     ORDER BY $orderBySQL
 ");
 $stmt->execute($params);
