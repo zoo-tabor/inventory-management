@@ -21,7 +21,7 @@ function e($string) {
  * @return string Generated URL
  */
 function url($route, $params = []) {
-    $url = 'index.php?route=' . urlencode($route);
+    $url = '/index.php?route=' . urlencode($route);
 
     foreach ($params as $key => $value) {
         $url .= '&' . urlencode($key) . '=' . urlencode($value);
