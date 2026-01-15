@@ -142,9 +142,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Preserve filter parameters when redirecting
     $redirectParams = [];
-    if (!empty($_GET['search'])) $redirectParams['search'] = $_GET['search'];
-    if (!empty($_GET['category'])) $redirectParams['category'] = $_GET['category'];
-    if (!empty($_GET['status'])) $redirectParams['status'] = $_GET['status'];
+    if (!empty($_POST['filter_search'])) $redirectParams['search'] = $_POST['filter_search'];
+    if (!empty($_POST['filter_category'])) $redirectParams['category'] = $_POST['filter_category'];
+    if (!empty($_POST['filter_status'])) $redirectParams['status'] = $_POST['filter_status'];
 
     redirect('items', $redirectParams);
 }
@@ -392,6 +392,10 @@ include __DIR__ . '/../../includes/header.php';
             <?= csrfField() ?>
             <input type="hidden" name="action" id="formAction" value="create">
             <input type="hidden" name="id" id="itemId">
+            <!-- Preserve filter state -->
+            <input type="hidden" name="filter_search" value="<?= e($search) ?>">
+            <input type="hidden" name="filter_category" value="<?= e($categoryFilter) ?>">
+            <input type="hidden" name="filter_status" value="<?= e($statusFilter) ?>">
 
             <div class="modal-body">
                 <div class="form-row">
