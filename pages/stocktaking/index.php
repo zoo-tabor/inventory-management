@@ -45,18 +45,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $items = $stmt->fetchAll();
 
             foreach ($items as $item) {
-                $difference = $item['counted_quantity'] - $item['expected_quantity'];
+                // Use location from stocktaking_item (supports multi-location inventories)
+                $locationId = $item['location_id'];
 
+                if (!$locationId) {
+                    // Skip items without location
+                    continue;
+                }
+
+                $countedQty = $item['counted_quantity'];
+                $expectedQty = $item['expected_quantity'];
+                $difference = $countedQty - $expectedQty;
+
+                // Always update stock to the counted quantity (SET, not ADD/SUBTRACT)
+                $stmt = $db->prepare("
+                    INSERT INTO stock (company_id, item_id, location_id, quantity)
+                    VALUES (?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE quantity = ?
+                ");
+                $stmt->execute([
+                    getCurrentCompanyId(),
+                    $item['item_id'],
+                    $locationId,
+                    $countedQty,
+                    $countedQty
+                ]);
+
+                // Only create adjustment movement if there's a difference
                 if ($difference != 0) {
-                    // Use location from stocktaking_item (supports multi-location inventories)
-                    $locationId = $item['location_id'];
-
-                    if (!$locationId) {
-                        // Skip items without location
-                        continue;
-                    }
-
-                    // Create adjustment movement
                     $movementType = $difference > 0 ? 'prijem' : 'vydej';
                     $quantity = abs($difference);
 
@@ -77,25 +93,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         date('Y-m-d'),
                         $_SESSION['user_id']
                     ]);
-
-                    // Update stock - use INSERT ON DUPLICATE KEY UPDATE to handle both new and existing records
-                    if ($difference > 0) {
-                        // Add to stock
-                        $stmt = $db->prepare("
-                            INSERT INTO stock (item_id, location_id, company_id, quantity)
-                            VALUES (?, ?, ?, ?)
-                            ON DUPLICATE KEY UPDATE quantity = quantity + ?
-                        ");
-                        $stmt->execute([$item['item_id'], $locationId, getCurrentCompanyId(), $quantity, $quantity]);
-                    } else {
-                        // Subtract from stock
-                        $stmt = $db->prepare("
-                            INSERT INTO stock (item_id, location_id, company_id, quantity)
-                            VALUES (?, ?, ?, 0)
-                            ON DUPLICATE KEY UPDATE quantity = quantity - ?
-                        ");
-                        $stmt->execute([$item['item_id'], $locationId, getCurrentCompanyId(), $quantity]);
-                    }
                 }
             }
 
