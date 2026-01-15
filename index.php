@@ -180,8 +180,10 @@ function handleRoute($basePath, $action, $id = null) {
     $file = $basePath . $action . '.php';
 
     if (file_exists($file)) {
-        // Make $id available to the page
-        $_GET['id'] = $id;
+        // Make $id available to the page (only if not already set via query string)
+        if ($id !== null && !isset($_GET['id'])) {
+            $_GET['id'] = $id;
+        }
         require $file;
     } else {
         // Default to index.php if action file doesn't exist
