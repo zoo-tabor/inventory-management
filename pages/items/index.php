@@ -151,7 +151,7 @@ $offset = ($page - 1) * $perPage;
 // Filters
 $search = $_GET['search'] ?? '';
 $categoryFilter = $_GET['category'] ?? '';
-$statusFilter = $_GET['status'] ?? '';
+$statusFilter = $_GET['status'] ?? 'active';  // Default to active items
 
 // Get items for current company with filters
 try {
@@ -239,11 +239,25 @@ include __DIR__ . '/../../includes/header.php';
     </button>
 </div>
 
-<!-- Filters -->
-<div class="card" style="margin-bottom: var(--spacing-lg);">
-    <div class="card-body">
+<!-- Items Table -->
+<div class="card">
+    <!-- Tabs -->
+    <div class="tabs">
+        <a href="<?= url('items', ['status' => 'active', 'search' => $search, 'category' => $categoryFilter]) ?>"
+           class="tab <?= $statusFilter === 'active' || empty($statusFilter) ? 'active' : '' ?>">
+            Aktivní položky
+        </a>
+        <a href="<?= url('items', ['status' => 'inactive', 'search' => $search, 'category' => $categoryFilter]) ?>"
+           class="tab <?= $statusFilter === 'inactive' ? 'active' : '' ?>">
+            Neaktivní položky
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="card-body" style="border-bottom: 1px solid var(--gray-200); padding-bottom: var(--spacing-lg);">
         <form method="GET" action="<?= url('items') ?>" class="filters-form">
             <input type="hidden" name="route" value="items">
+            <input type="hidden" name="status" value="<?= e($statusFilter) ?>">
             <div class="filter-row">
                 <div class="form-group">
                     <label for="search">Hledat</label>
@@ -262,26 +276,14 @@ include __DIR__ . '/../../includes/header.php';
                     </select>
                 </div>
 
-                <div class="form-group">
-                    <label for="status">Stav</label>
-                    <select id="status" name="status" class="form-control">
-                        <option value="">Všechny</option>
-                        <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Aktivní</option>
-                        <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Neaktivní</option>
-                    </select>
-                </div>
-
                 <div class="form-group" style="display: flex; align-items: flex-end; gap: var(--spacing-sm);">
                     <button type="submit" class="btn btn-secondary">Filtrovat</button>
-                    <a href="<?= url('items') ?>" class="btn btn-secondary">Zrušit</a>
+                    <a href="<?= url('items', ['status' => $statusFilter]) ?>" class="btn btn-secondary">Zrušit</a>
                 </div>
             </div>
         </form>
     </div>
-</div>
 
-<!-- Items Table -->
-<div class="card">
     <div class="card-body">
         <?php if (empty($items)): ?>
             <div class="empty-state">
@@ -303,7 +305,6 @@ include __DIR__ . '/../../includes/header.php';
                         <th class="text-right">Optimální stav</th>
                         <th class="text-right">Skladem</th>
                         <th class="text-right">Cena</th>
-                        <th class="text-center">Stav</th>
                         <th class="text-right">Akce</th>
                     </tr>
                 </thead>
@@ -332,13 +333,6 @@ include __DIR__ . '/../../includes/header.php';
                             </td>
                             <td class="text-right">
                                 <?= $item['price'] ? formatNumber($item['price'], 2) . ' Kč' : '—' ?>
-                            </td>
-                            <td class="text-center">
-                                <?php if ($item['is_active']): ?>
-                                    <span class="badge badge-success">Aktivní</span>
-                                <?php else: ?>
-                                    <span class="badge badge-secondary">Neaktivní</span>
-                                <?php endif; ?>
                             </td>
                             <td class="text-right">
                                 <button type="button" class="btn btn-sm btn-secondary"
@@ -601,9 +595,37 @@ include __DIR__ . '/../../includes/header.php';
 
     .filter-row {
         display: grid;
-        grid-template-columns: 2fr 1.5fr 1fr auto;
+        grid-template-columns: 2fr 1.5fr auto;
         gap: var(--spacing-md);
         align-items: end;
+    }
+
+    .tabs {
+        display: flex;
+        border-bottom: 2px solid var(--gray-200);
+        background: var(--gray-50);
+    }
+
+    .tab {
+        padding: var(--spacing-md) var(--spacing-xl);
+        color: var(--text-secondary);
+        text-decoration: none;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+        font-weight: 500;
+        transition: all 0.15s ease-in-out;
+    }
+
+    .tab:hover {
+        color: var(--text-primary);
+        background: var(--gray-100);
+        text-decoration: none;
+    }
+
+    .tab.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+        background: white;
     }
 </style>
 
