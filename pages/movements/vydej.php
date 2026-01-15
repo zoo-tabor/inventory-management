@@ -263,8 +263,9 @@ require __DIR__ . '/../../includes/header.php';
 
                 <!-- Department Selection -->
                 <div class="form-group">
-                    <label for="department_id">Oddělení</label>
-                    <select name="department_id" id="department_id" class="form-control" disabled>
+                    <label for="department_id_display">Oddělení</label>
+                    <input type="hidden" name="department_id" id="department_id_hidden" value="">
+                    <select id="department_id_display" class="form-control" disabled>
                         <option value="">-- Vyberte oddělení --</option>
                         <?php foreach ($departments as $department): ?>
                             <option value="<?= $department['id'] ?>">
@@ -592,7 +593,8 @@ if (document.getElementById('item_id').value) {
 const employeeSearchInput = document.getElementById('employee_search');
 const employeeSelect = document.getElementById('employee_id');
 const employeeDropdown = document.getElementById('employee_dropdown');
-const departmentSelect = document.getElementById('department_id');
+const departmentSelect = document.getElementById('department_id_display');
+const departmentHidden = document.getElementById('department_id_hidden');
 
 employeeSearchInput.addEventListener('input', function(e) {
     const searchText = e.target.value.toLowerCase().trim();
@@ -601,6 +603,7 @@ employeeSearchInput.addEventListener('input', function(e) {
         employeeDropdown.style.display = 'none';
         employeeSelect.value = '';
         departmentSelect.value = '';
+        departmentHidden.value = '';
         selectedEmployeeIndex = -1;
         return;
     }
@@ -688,11 +691,13 @@ function selectEmployee(employee) {
     employeeDropdown.style.display = 'none';
     selectedEmployeeIndex = -1;
 
-    // Auto-populate department
+    // Auto-populate department (both display and hidden field)
     if (employee.departmentId) {
         departmentSelect.value = employee.departmentId;
+        departmentHidden.value = employee.departmentId;
     } else {
         departmentSelect.value = '';
+        departmentHidden.value = '';
     }
 }
 
