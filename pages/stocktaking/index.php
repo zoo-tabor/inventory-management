@@ -63,8 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $stmt = $db->prepare("
                         INSERT INTO stock_movements (
                             company_id, item_id, location_id, user_id,
-                            movement_type, quantity, note, movement_date
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            movement_type, quantity, note, movement_date, created_by
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ");
                     $stmt->execute([
                         getCurrentCompanyId(),
@@ -74,7 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $movementType,
                         $quantity,
                         "Inventurní úprava - Inventura #{$stocktakingId}",
-                        date('Y-m-d')
+                        date('Y-m-d'),
+                        $_SESSION['user_id']
                     ]);
 
                     // Update stock
