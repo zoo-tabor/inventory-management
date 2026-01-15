@@ -237,7 +237,7 @@ require __DIR__ . '/../../includes/header.php';
                         <option value="">-- Vyberte zaměstnance --</option>
                         <?php foreach ($employees as $employee): ?>
                             <option value="<?= $employee['id'] ?>">
-                                <?= e($employee['full_name']) ?> <?= e($employee) ?>
+                                <?= e($employee['full_name']) ?>
                                 <?php if ($employee['department_name']): ?>
                                     - <?= e($employee['department_name']) ?>
                                 <?php endif; ?>
