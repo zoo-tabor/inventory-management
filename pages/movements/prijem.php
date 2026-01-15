@@ -57,15 +57,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Insert movement record
         $stmt = $db->prepare("
             INSERT INTO stock_movements (
-                company_id, item_id, location_id, user_id,
+                company_id, item_id, location_id, user_id, created_by,
                 movement_type, quantity, note, movement_date
-            ) VALUES (?, ?, ?, ?, 'prijem', ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, 'prijem', ?, ?, ?)
         ");
         $stmt->execute([
             getCurrentCompanyId(),
             $itemId,
             $locationId,
             $_SESSION['user_id'],
+            $_SESSION['user_id'],  // created_by same as user_id
             $quantityInPieces,
             $note,
             $movementDate
