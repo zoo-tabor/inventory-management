@@ -4,7 +4,9 @@
  * Shows current database table structure
  */
 
-require __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../classes/Database.php';
 
 // Security check
 $key = $_GET['key'] ?? '';
