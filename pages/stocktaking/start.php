@@ -56,25 +56,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $db->prepare("
                 SELECT
                     i.id as item_id,
+                    ? as location_id,
                     COALESCE(s.quantity, 0) as current_stock
                 FROM items i
                 LEFT JOIN stock s ON i.id = s.item_id AND s.location_id = ?
                 WHERE $whereSQL
                 ORDER BY i.name
             ");
-            $params = [$locationId, ...$params];
+            $params = [$locationId, $locationId, ...$params];
             $stmt->execute($params);
         } else {
-            // All locations - sum up stock
+            // All locations - create separate entries for each location
             $stmt = $db->prepare("
                 SELECT
                     i.id as item_id,
-                    COALESCE(SUM(s.quantity), 0) as current_stock
+                    s.location_id,
+                    s.quantity as current_stock
                 FROM items i
-                LEFT JOIN stock s ON i.id = s.item_id
-                WHERE $whereSQL
-                GROUP BY i.id
-                ORDER BY i.name
+                INNER JOIN stock s ON i.id = s.item_id
+                WHERE $whereSQL AND s.quantity > 0
+                ORDER BY i.name, s.location_id
             ");
             $stmt->execute($params);
         }
@@ -83,20 +84,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Insert stocktaking items
         $insertStmt = $db->prepare("
-            INSERT INTO stocktaking_items (stocktaking_id, item_id, expected_quantity)
-            VALUES (?, ?, ?)
+            INSERT INTO stocktaking_items (stocktaking_id, item_id, location_id, expected_quantity)
+            VALUES (?, ?, ?, ?)
         ");
 
         $itemCount = 0;
         foreach ($items as $item) {
-            // Skip zero stock items if not included
-            if (!$includeZeroStock && $item['current_stock'] == 0) {
+            // Skip zero stock items if not included (only for specific location)
+            if ($locationId > 0 && !$includeZeroStock && $item['current_stock'] == 0) {
                 continue;
             }
 
             $insertStmt->execute([
                 $stocktakingId,
                 $item['item_id'],
+                $item['location_id'],
                 $item['current_stock']
             ]);
             $itemCount++;
@@ -178,6 +180,7 @@ require __DIR__ . '/../../includes/header.php';
                         <label for="location_id">Sklad *</label>
                         <select name="location_id" id="location_id" class="form-control" required>
                             <option value="">— Vyberte sklad —</option>
+                            <option value="0">Všechny sklady</option>
                             <?php foreach ($locations as $location): ?>
                                 <option value="<?= $location['id'] ?>">
                                     <?= e($location['name']) ?> (<?= e($location['code']) ?>)
@@ -185,7 +188,7 @@ require __DIR__ . '/../../includes/header.php';
                             <?php endforeach; ?>
                         </select>
                         <small class="form-text">
-                            Vyberte sklad, ve kterém bude probíhat inventura.
+                            Vyberte konkrétní sklad nebo "Všechny sklady" pro inventuru na všech skladech najednou.
                         </small>
                     </div>
 

@@ -46,17 +46,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('stocktaking/count', ['id' => $stocktakingId]);
     }
 
-    $itemId = (int)$_POST['item_id'];
+    $stocktakingItemId = (int)$_POST['stocktaking_item_id'];
     $countedQuantity = (int)$_POST['counted_quantity'];
+    $newLocationId = (int)$_POST['location_id'];
     $note = sanitize($_POST['note'] ?? '');
 
     try {
         $stmt = $db->prepare("
             UPDATE stocktaking_items
-            SET counted_quantity = ?, note = ?, counted_at = NOW()
-            WHERE stocktaking_id = ? AND item_id = ?
+            SET counted_quantity = ?, location_id = ?, note = ?, counted_at = NOW()
+            WHERE id = ? AND stocktaking_id = ?
         ");
-        $stmt->execute([$countedQuantity, $note, $stocktakingId, $itemId]);
+        $stmt->execute([$countedQuantity, $newLocationId, $note, $stocktakingItemId, $stocktakingId]);
 
         setFlash('success', 'Počet byl zaznamenán.');
 
@@ -67,6 +68,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     redirect('stocktaking/count', ['id' => $stocktakingId]);
 }
+
+// Get locations for dropdown
+$stmt = $db->prepare("SELECT id, name, code FROM locations WHERE company_id = ? AND is_active = 1 ORDER BY name");
+$stmt->execute([getCurrentCompanyId()]);
+$locations = $stmt->fetchAll();
 
 // Get filter
 $statusFilter = sanitize($_GET['status'] ?? '');
@@ -99,12 +105,15 @@ $stmt = $db->prepare("
         i.code as item_code,
         i.unit as item_unit,
         i.pieces_per_package,
-        c.name as category_name
+        c.name as category_name,
+        l.name as location_name,
+        l.code as location_code
     FROM stocktaking_items si
     INNER JOIN items i ON si.item_id = i.id
     LEFT JOIN categories c ON i.category_id = c.id
+    LEFT JOIN locations l ON si.location_id = l.id
     WHERE $whereSQL
-    ORDER BY i.name
+    ORDER BY i.name, l.name
 ");
 $stmt->execute($params);
 $items = $stmt->fetchAll();
@@ -236,6 +245,7 @@ require __DIR__ . '/../../includes/header.php';
                             <th>Kód</th>
                             <th>Název položky</th>
                             <th>Kategorie</th>
+                            <th>Sklad</th>
                             <th>Očekávaný stav</th>
                             <th>Napočítáno</th>
                             <th>Rozdíl</th>
@@ -253,10 +263,19 @@ require __DIR__ . '/../../includes/header.php';
                                 $rowClass = $difference == 0 ? 'row-ok' : 'row-diff';
                             }
                             ?>
-                            <tr class="<?= $rowClass ?>" id="row-<?= $item['item_id'] ?>">
+                            <tr class="<?= $rowClass ?>" id="row-<?= $item['id'] ?>">
                                 <td><strong><?= e($item['item_code']) ?></strong></td>
                                 <td><?= e($item['item_name']) ?></td>
                                 <td><?= e($item['category_name'] ?? '-') ?></td>
+                                <td>
+                                    <?php if ($item['location_name']): ?>
+                                        <strong><?= e($item['location_name']) ?></strong>
+                                        <br>
+                                        <small class="text-muted"><?= e($item['location_code']) ?></small>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td>
                                     <strong><?= formatNumber($item['expected_quantity']) ?></strong> <?= e($item['item_unit']) ?>
                                     <?php if ($item['pieces_per_package'] > 1): ?>
@@ -300,10 +319,14 @@ require __DIR__ . '/../../includes/header.php';
                                         type="button"
                                         class="btn btn-sm btn-primary"
                                         onclick="openCountModal(<?= htmlspecialchars(json_encode([
+                                            'id' => $item['id'],
                                             'item_id' => $item['item_id'],
                                             'item_name' => $item['item_name'],
                                             'item_code' => $item['item_code'],
                                             'item_unit' => $item['item_unit'],
+                                            'location_id' => $item['location_id'],
+                                            'location_name' => $item['location_name'],
+                                            'location_code' => $item['location_code'],
                                             'expected_quantity' => $item['expected_quantity'],
                                             'counted_quantity' => $item['counted_quantity'],
                                             'note' => $item['note'],
@@ -331,7 +354,7 @@ require __DIR__ . '/../../includes/header.php';
         </div>
         <form method="POST" id="countForm">
             <?= csrfField() ?>
-            <input type="hidden" name="item_id" id="modal_item_id">
+            <input type="hidden" name="stocktaking_item_id" id="modal_stocktaking_item_id">
 
             <div class="modal-body">
                 <div class="item-info-box">
@@ -350,6 +373,19 @@ require __DIR__ . '/../../includes/header.php';
                 </div>
 
                 <div class="form-group">
+                    <label for="location_id" class="required">Sklad</label>
+                    <select name="location_id" id="modal_location_id" class="form-control" required>
+                        <option value="">-- Vyberte sklad --</option>
+                        <?php foreach ($locations as $location): ?>
+                            <option value="<?= $location['id'] ?>">
+                                <?= e($location['name']) ?> (<?= e($location['code']) ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <small class="form-text">Můžete změnit sklad, pokud položka byla přemístěna.</small>
+                </div>
+
+                <div class="form-group">
                     <label for="counted_quantity" class="required">Napočtené množství</label>
                     <input
                         type="number"
@@ -359,7 +395,6 @@ require __DIR__ . '/../../includes/header.php';
                         min="0"
                         step="1"
                         required
-                        autofocus
                         onchange="calculateDifference()"
                     >
                     <small class="form-text" id="differenceHelper"></small>
@@ -490,11 +525,15 @@ let currentItem = null;
 function openCountModal(itemData) {
     currentItem = itemData;
 
-    document.getElementById('modal_item_id').value = itemData.item_id;
+    document.getElementById('modal_stocktaking_item_id').value = itemData.id;
     document.getElementById('modal_item_code').textContent = itemData.item_code;
     document.getElementById('modal_item_name').textContent = itemData.item_name;
     document.getElementById('modal_expected').textContent =
         formatNumber(itemData.expected_quantity) + ' ' + itemData.item_unit;
+
+    // Set location
+    const locationSelect = document.getElementById('modal_location_id');
+    locationSelect.value = itemData.location_id || '';
 
     const quantityInput = document.getElementById('counted_quantity');
     quantityInput.value = itemData.counted_quantity !== null ? itemData.counted_quantity : '';
@@ -504,7 +543,7 @@ function openCountModal(itemData) {
     calculateDifference();
 
     document.getElementById('countModal').classList.add('active');
-    setTimeout(() => quantityInput.focus(), 100);
+    setTimeout(() => locationSelect.focus(), 100);
 }
 
 function closeCountModal() {
