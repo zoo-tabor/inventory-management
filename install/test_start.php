@@ -28,8 +28,11 @@ echo "</head>\n";
 echo "<body>\n";
 echo "    <h1>Test načtení stocktaking/start.php</h1>\n";
 
+// Load config first to get MIGRATE_KEY
+require_once __DIR__ . '/../config/config.php';
+
 // Security check - require migration key
-if (!isset($_GET['key']) || $_GET['key'] !== (defined('MIGRATE_KEY') ? MIGRATE_KEY : '')) {
+if (!isset($_GET['key']) || $_GET['key'] !== MIGRATE_KEY) {
     echo "    <div class='error'>Neplatný klíč. Přidejte parametr ?key=your_migrate_key</div>\n";
     echo "</body></html>";
     exit;
@@ -39,10 +42,7 @@ echo "    <div class='info'>Zkouším načíst všechny required soubory...</div
 flush();
 
 try {
-    // Load configuration
-    echo "    <div class='info'>Načítám config/config.php...</div>\n";
-    flush();
-    require_once __DIR__ . '/../config/config.php';
+    // config.php already loaded for security check
     echo "    <div class='success'>✓ config.php načten</div>\n";
     flush();
 
