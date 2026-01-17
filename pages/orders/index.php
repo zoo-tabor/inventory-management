@@ -590,8 +590,19 @@ function showBulkExport() {
         const cells = row.querySelectorAll('td');
         if (cells.length > 1) {
             const code = cells[1].textContent.trim(); // Item code
-            const recommendedQty = cells[7].textContent.trim().split('\n')[0].replace(/\s+/g, ''); // Recommended quantity
-            exportLines.push(`${code} ${recommendedQty}`);
+            const recommendedCell = cells[7].textContent.trim().split('\n');
+
+            // Check if there's package quantity (second line with "(X bal)")
+            let quantity;
+            if (recommendedCell.length > 1 && recommendedCell[1].includes('bal')) {
+                // Extract package quantity from "(X bal)" format
+                quantity = recommendedCell[1].replace(/[()bal\s]/g, '');
+            } else {
+                // Use pieces quantity, remove unit
+                quantity = recommendedCell[0].replace(/\s+/g, '').replace(/ks$/, '');
+            }
+
+            exportLines.push(`${code} ${quantity}`);
         }
     });
 
