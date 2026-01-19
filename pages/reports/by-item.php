@@ -32,7 +32,7 @@ $categories = $stmt->fetchAll();
 
 // Get items
 $stmt = $db->prepare("
-    SELECT i.id, i.name, i.code, i.unit, i.pieces_per_package, c.name as category_name
+    SELECT i.id, i.name, i.code, i.unit, i.pieces_per_package, i.category_id, c.name as category_name
     FROM items i
     LEFT JOIN categories c ON i.category_id = c.id
     WHERE i.company_id = ? AND i.is_active = 1
@@ -342,30 +342,40 @@ require __DIR__ . '/../../includes/header.php';
 
             <div class="form-row <?= $viewMode === 'spotreba' ? 'form-row-spotreba' : '' ?>">
                 <div class="form-group">
-                    <label>Položka</label>
-                    <select name="id" class="form-control" <?= $viewMode === 'spotreba' ? 'required' : '' ?>>
-                        <option value=""><?= $viewMode === 'spotreba' ? '-- Vyberte položku --' : 'Všechny položky' ?></option>
-                        <?php foreach ($items as $item): ?>
-                            <option value="<?= $item['id'] ?>" <?= $itemId === $item['id'] ? 'selected' : '' ?>>
-                                <?= e($item['code']) ?> - <?= e($item['name']) ?>
-                                <?php if ($item['category_name']): ?>
-                                    (<?= e($item['category_name']) ?>)
-                                <?php endif; ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <label>Kategorie</label>
+                    <div class="searchable-select" id="categorySelectWrapper">
+                        <input type="text" class="form-control searchable-input" id="categorySearch" placeholder="Hledat kategorii..." autocomplete="off">
+                        <select name="category" class="form-control" id="categorySelect">
+                            <option value="">Všechny kategorie</option>
+                            <?php foreach ($categories as $cat): ?>
+                                <option value="<?= $cat['id'] ?>" <?= $categoryFilter === $cat['id'] ? 'selected' : '' ?>>
+                                    <?= e($cat['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="searchable-dropdown" id="categoryDropdown"></div>
+                    </div>
                 </div>
 
                 <div class="form-group">
-                    <label>Kategorie</label>
-                    <select name="category" class="form-control">
-                        <option value="">Všechny kategorie</option>
-                        <?php foreach ($categories as $cat): ?>
-                            <option value="<?= $cat['id'] ?>" <?= $categoryFilter === $cat['id'] ? 'selected' : '' ?>>
-                                <?= e($cat['name']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <label>Položka</label>
+                    <div class="searchable-select" id="itemSelectWrapper">
+                        <input type="text" class="form-control searchable-input" id="itemSearch" placeholder="Hledat položku..." autocomplete="off">
+                        <select name="id" class="form-control" id="itemSelect" <?= $viewMode === 'spotreba' ? 'required' : '' ?>>
+                            <option value=""><?= $viewMode === 'spotreba' ? '-- Vyberte položku --' : 'Všechny položky' ?></option>
+                            <?php foreach ($items as $item): ?>
+                                <option value="<?= $item['id'] ?>"
+                                        data-category="<?= $item['category_id'] ?? '' ?>"
+                                        <?= $itemId === $item['id'] ? 'selected' : '' ?>>
+                                    <?= e($item['code']) ?> - <?= e($item['name']) ?>
+                                    <?php if ($item['category_name']): ?>
+                                        (<?= e($item['category_name']) ?>)
+                                    <?php endif; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="searchable-dropdown" id="itemDropdown"></div>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -799,13 +809,79 @@ require __DIR__ . '/../../includes/header.php';
 /* Filter form */
 .filter-form .form-row {
     display: grid;
-    grid-template-columns: 2fr 1.5fr 1fr 1fr auto;
+    grid-template-columns: 1.5fr 2fr 1fr 1fr auto;
     gap: 1rem;
     align-items: end;
 }
 
 .filter-form .form-row-spotreba {
-    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 80px auto;
+    grid-template-columns: 1fr 2fr 1fr 1fr 1fr 80px auto;
+}
+
+/* Searchable Select */
+.searchable-select {
+    position: relative;
+}
+
+.searchable-select select {
+    display: none;
+}
+
+.searchable-select .searchable-input {
+    cursor: pointer;
+    background: white;
+}
+
+.searchable-select .searchable-input:focus {
+    cursor: text;
+}
+
+.searchable-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 300px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+}
+
+.searchable-dropdown.active {
+    display: block;
+}
+
+.searchable-dropdown-item {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.searchable-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.searchable-dropdown-item:hover,
+.searchable-dropdown-item.highlighted {
+    background: #dbeafe;
+}
+
+.searchable-dropdown-item.selected {
+    background: #2563eb;
+    color: white;
+}
+
+.searchable-dropdown-empty {
+    padding: 0.75rem;
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.875rem;
 }
 
 /* Consumption Summary */
@@ -977,5 +1053,198 @@ require __DIR__ . '/../../includes/header.php';
     }
 }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize searchable selects
+    initSearchableSelect('categorySelect', 'categorySearch', 'categoryDropdown', function(selectedValue) {
+        // When category changes, filter items and reset item selection
+        filterItemsByCategory(selectedValue);
+        document.getElementById('itemSelect').value = '';
+        document.getElementById('itemSearch').value = '';
+        updateItemDropdown();
+    });
+
+    initSearchableSelect('itemSelect', 'itemSearch', 'itemDropdown', null, function() {
+        // Get current category filter when building item list
+        return document.getElementById('categorySelect').value;
+    });
+
+    // Set initial values from selected options
+    const categorySelect = document.getElementById('categorySelect');
+    const itemSelect = document.getElementById('itemSelect');
+    const categorySearch = document.getElementById('categorySearch');
+    const itemSearch = document.getElementById('itemSearch');
+
+    if (categorySelect.selectedIndex > 0) {
+        categorySearch.value = categorySelect.options[categorySelect.selectedIndex].text;
+    }
+    if (itemSelect.selectedIndex > 0) {
+        itemSearch.value = itemSelect.options[itemSelect.selectedIndex].text;
+    }
+
+    // Initial filter of items based on category
+    filterItemsByCategory(categorySelect.value);
+});
+
+function initSearchableSelect(selectId, inputId, dropdownId, onChangeCallback, getCategoryFilter) {
+    const select = document.getElementById(selectId);
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(dropdownId);
+
+    let highlightedIndex = -1;
+    let filteredOptions = [];
+
+    function buildDropdown(searchText = '') {
+        const categoryFilter = getCategoryFilter ? getCategoryFilter() : null;
+        dropdown.innerHTML = '';
+        filteredOptions = [];
+        highlightedIndex = -1;
+
+        const searchLower = searchText.toLowerCase();
+
+        Array.from(select.options).forEach((option, index) => {
+            // Skip hidden options (items filtered by category)
+            if (option.style.display === 'none') return;
+
+            const text = option.text;
+            const value = option.value;
+
+            // Filter by search text
+            if (searchText && !text.toLowerCase().includes(searchLower)) return;
+
+            filteredOptions.push({ value, text, index });
+
+            const div = document.createElement('div');
+            div.className = 'searchable-dropdown-item';
+            if (option.selected) div.classList.add('selected');
+            div.textContent = text;
+            div.dataset.value = value;
+            div.dataset.index = filteredOptions.length - 1;
+
+            div.addEventListener('click', function(e) {
+                e.stopPropagation();
+                selectOption(value, text);
+            });
+
+            dropdown.appendChild(div);
+        });
+
+        if (filteredOptions.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'searchable-dropdown-empty';
+            empty.textContent = 'Žádné výsledky';
+            dropdown.appendChild(empty);
+        }
+    }
+
+    function selectOption(value, text) {
+        select.value = value;
+        input.value = value ? text : '';
+        dropdown.classList.remove('active');
+
+        if (onChangeCallback) {
+            onChangeCallback(value);
+        }
+    }
+
+    function updateHighlight() {
+        const items = dropdown.querySelectorAll('.searchable-dropdown-item');
+        items.forEach((item, i) => {
+            item.classList.toggle('highlighted', i === highlightedIndex);
+        });
+
+        // Scroll highlighted item into view
+        if (highlightedIndex >= 0 && items[highlightedIndex]) {
+            items[highlightedIndex].scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    input.addEventListener('focus', function() {
+        buildDropdown(this.value);
+        dropdown.classList.add('active');
+    });
+
+    input.addEventListener('input', function() {
+        buildDropdown(this.value);
+        dropdown.classList.add('active');
+    });
+
+    input.addEventListener('keydown', function(e) {
+        if (!dropdown.classList.contains('active')) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            highlightedIndex = Math.min(highlightedIndex + 1, filteredOptions.length - 1);
+            updateHighlight();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            highlightedIndex = Math.max(highlightedIndex - 1, 0);
+            updateHighlight();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (highlightedIndex >= 0 && filteredOptions[highlightedIndex]) {
+                const opt = filteredOptions[highlightedIndex];
+                selectOption(opt.value, opt.text);
+            }
+        } else if (e.key === 'Escape') {
+            dropdown.classList.remove('active');
+            // Restore previous value
+            if (select.selectedIndex >= 0) {
+                input.value = select.options[select.selectedIndex].text;
+            }
+        }
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.classList.remove('active');
+            // Restore previous value if input doesn't match
+            if (select.selectedIndex >= 0) {
+                const selectedText = select.options[select.selectedIndex].text;
+                if (input.value !== selectedText && select.value) {
+                    input.value = selectedText;
+                }
+            }
+        }
+    });
+}
+
+function filterItemsByCategory(categoryId) {
+    const itemSelect = document.getElementById('itemSelect');
+
+    Array.from(itemSelect.options).forEach((option, index) => {
+        if (index === 0) {
+            // Always show "Všechny položky" / "-- Vyberte položku --"
+            option.style.display = '';
+            return;
+        }
+
+        const itemCategory = option.dataset.category;
+
+        if (!categoryId || categoryId === '') {
+            // Show all items
+            option.style.display = '';
+        } else if (itemCategory === categoryId) {
+            // Show items matching category
+            option.style.display = '';
+        } else {
+            // Hide items not matching category
+            option.style.display = 'none';
+        }
+    });
+}
+
+function updateItemDropdown() {
+    // Trigger rebuild of item dropdown if it's open
+    const itemSearch = document.getElementById('itemSearch');
+    const itemDropdown = document.getElementById('itemDropdown');
+
+    if (itemDropdown.classList.contains('active')) {
+        itemSearch.dispatchEvent(new Event('input'));
+    }
+}
+</script>
 
 <?php require __DIR__ . '/../../includes/footer.php'; ?>
