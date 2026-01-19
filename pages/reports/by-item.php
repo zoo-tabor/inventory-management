@@ -153,12 +153,13 @@ if ($viewMode === 'spotreba' && $itemId > 0) {
     }
 
     // Get consumption data grouped by department and period
+    // Calculate total quantity: (quantity_packages * pieces_per_package) + quantity
     $stmt = $db->prepare("
         SELECT
             d.id as department_id,
             d.name as department_name,
             $periodSQL as period,
-            SUM(sm.quantity) as total_consumed
+            SUM(COALESCE(sm.quantity_packages, 0) * COALESCE(i.pieces_per_package, 1) + COALESCE(sm.quantity, 0)) as total_consumed
         FROM stock_movements sm
         INNER JOIN departments d ON sm.department_id = d.id
         INNER JOIN items i ON sm.item_id = i.id
@@ -227,6 +228,7 @@ $movements = [];
 
 if ($viewMode === 'prehled') {
     // Get item statistics
+    // Calculate total quantity: (quantity_packages * pieces_per_package) + quantity
     $stmt = $db->prepare("
         SELECT
             i.id,
@@ -234,11 +236,12 @@ if ($viewMode === 'prehled') {
             i.code,
             i.unit,
             i.minimum_stock,
+            i.pieces_per_package,
             c.name as category_name,
             COUNT(DISTINCT CASE WHEN sm.movement_type = 'prijem' THEN sm.id END) as total_receipts,
             COUNT(DISTINCT CASE WHEN sm.movement_type = 'vydej' THEN sm.id END) as total_issues,
-            SUM(CASE WHEN sm.movement_type = 'prijem' THEN sm.quantity ELSE 0 END) as total_received,
-            SUM(CASE WHEN sm.movement_type = 'vydej' THEN sm.quantity ELSE 0 END) as total_issued,
+            SUM(CASE WHEN sm.movement_type = 'prijem' THEN COALESCE(sm.quantity_packages, 0) * COALESCE(i.pieces_per_package, 1) + COALESCE(sm.quantity, 0) ELSE 0 END) as total_received,
+            SUM(CASE WHEN sm.movement_type = 'vydej' THEN COALESCE(sm.quantity_packages, 0) * COALESCE(i.pieces_per_package, 1) + COALESCE(sm.quantity, 0) ELSE 0 END) as total_issued,
             (SELECT SUM(quantity) FROM stock WHERE item_id = i.id) as current_stock
         FROM items i
         LEFT JOIN categories c ON i.category_id = c.id
@@ -246,7 +249,7 @@ if ($viewMode === 'prehled') {
         WHERE i.company_id = ? AND i.is_active = 1
         " . ($itemId > 0 ? "AND i.id = ?" : "") . "
         " . ($categoryFilter > 0 ? "AND i.category_id = ?" : "") . "
-        GROUP BY i.id, i.name, i.code, i.unit, i.minimum_stock, c.name
+        GROUP BY i.id, i.name, i.code, i.unit, i.minimum_stock, i.pieces_per_package, c.name
         HAVING COUNT(DISTINCT CASE WHEN sm.movement_type = 'prijem' THEN sm.id END) > 0
             OR COUNT(DISTINCT CASE WHEN sm.movement_type = 'vydej' THEN sm.id END) > 0
         ORDER BY (COUNT(DISTINCT CASE WHEN sm.movement_type = 'prijem' THEN sm.id END) +
@@ -291,11 +294,13 @@ if ($viewMode === 'prehled') {
             $stmt = $db->prepare("
                 SELECT
                     sm.*,
+                    i.pieces_per_package,
                     l.name as location_name,
                     e.full_name as employee_name,
                     d.name as department_name,
                     u.full_name as user_name
                 FROM stock_movements sm
+                INNER JOIN items i ON sm.item_id = i.id
                 LEFT JOIN locations l ON sm.location_id = l.id
                 LEFT JOIN employees e ON sm.employee_id = e.id
                 LEFT JOIN departments d ON sm.department_id = d.id
@@ -735,6 +740,12 @@ require __DIR__ . '/../../includes/header.php';
                         </thead>
                         <tbody>
                             <?php foreach ($movements as $movement): ?>
+                                <?php
+                                $piecesPerPkg = $movement['pieces_per_package'] ?: 1;
+                                $pkgs = (float)($movement['quantity_packages'] ?? 0);
+                                $pcs = (int)($movement['quantity'] ?? 0);
+                                $totalQty = ($pkgs * $piecesPerPkg) + $pcs;
+                                ?>
                                 <tr class="movement-<?= $movement['movement_type'] ?>">
                                     <td>
                                         <?= formatDate($movement['movement_date']) ?>
@@ -749,7 +760,11 @@ require __DIR__ . '/../../includes/header.php';
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <strong><?= formatNumber($movement['quantity']) ?></strong> <?= e($itemDetail['unit']) ?>
+                                        <strong><?= formatNumber($totalQty) ?></strong> <?= e($itemDetail['unit']) ?>
+                                        <?php if ($piecesPerPkg > 1 && ($pkgs > 0 || $pcs > 0)): ?>
+                                            <br>
+                                            <small class="text-muted">(<?= formatNumber($pkgs) ?> bal + <?= $pcs ?> ks)</small>
+                                        <?php endif; ?>
                                     </td>
                                     <td><?= e($movement['location_name'] ?? '-') ?></td>
                                     <td>
