@@ -16,6 +16,7 @@ $viewMode = sanitize($_GET['view'] ?? 'nizky_stav');
 
 // Get filters
 $categoryFilter = (int)($_GET['category'] ?? 0);
+$excludeCategory = (int)($_GET['exclude_category'] ?? 0);
 $statusFilter = sanitize($_GET['status'] ?? 'low'); // low, critical, all
 $sortBy = sanitize($_GET['sort'] ?? 'priority'); // priority, name, quantity
 
@@ -35,6 +36,11 @@ $params = [getCurrentCompanyId()];
 if ($categoryFilter > 0) {
     $whereClauses[] = 'i.category_id = ?';
     $params[] = $categoryFilter;
+}
+
+if ($excludeCategory > 0) {
+    $whereClauses[] = '(i.category_id != ? OR i.category_id IS NULL)';
+    $params[] = $excludeCategory;
 }
 
 $whereSQL = implode(' AND ', $whereClauses);
@@ -306,6 +312,18 @@ require __DIR__ . '/../../includes/header.php';
                     </div>
 
                     <div class="form-group">
+                        <label>Vynechat kategorii</label>
+                        <select name="exclude_category" class="form-control">
+                            <option value="">-- Žádná --</option>
+                            <?php foreach ($categories as $cat): ?>
+                                <option value="<?= $cat['id'] ?>" <?= $excludeCategory === $cat['id'] ? 'selected' : '' ?>>
+                                    <?= e($cat['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
                         <label>Spotřeba za období</label>
                         <select name="period" class="form-control">
                             <option value="3" <?= $consumptionPeriod === 3 ? 'selected' : '' ?>>Posledních 3 měsíce</option>
@@ -533,6 +551,18 @@ require __DIR__ . '/../../includes/header.php';
                             <option value="">Všechny kategorie</option>
                             <?php foreach ($categories as $cat): ?>
                                 <option value="<?= $cat['id'] ?>" <?= $categoryFilter === $cat['id'] ? 'selected' : '' ?>>
+                                    <?= e($cat['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Vynechat kategorii</label>
+                        <select name="exclude_category" class="form-control">
+                            <option value="">-- Žádná --</option>
+                            <?php foreach ($categories as $cat): ?>
+                                <option value="<?= $cat['id'] ?>" <?= $excludeCategory === $cat['id'] ? 'selected' : '' ?>>
                                     <?= e($cat['name']) ?>
                                 </option>
                             <?php endforeach; ?>
@@ -798,13 +828,13 @@ require __DIR__ . '/../../includes/header.php';
 
 .filter-form .form-row {
     display: grid;
-    grid-template-columns: 1.5fr 1fr 1fr auto;
+    grid-template-columns: 1.5fr 1.5fr 1fr 1fr auto;
     gap: 1rem;
     align-items: end;
 }
 
 .filter-form .form-row-consumption {
-    grid-template-columns: 1.5fr 1fr 1fr 1fr auto;
+    grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr auto;
 }
 
 .card-header {
