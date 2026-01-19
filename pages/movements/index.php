@@ -1,7 +1,7 @@
 <?php
 /**
  * Stock Movements History
- * View all stock movements with filtering
+ * View all stock movements with filtering, sorting, and editing
  */
 
 if (!isLoggedIn()) {
@@ -10,6 +10,83 @@ if (!isLoggedIn()) {
 
 $pageTitle = 'Historie pohybů';
 $db = Database::getInstance();
+
+// Handle AJAX update request
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_movement') {
+    header('Content-Type: application/json');
+
+    $movementId = (int)($_POST['movement_id'] ?? 0);
+    $quantity = (float)($_POST['quantity'] ?? 0);
+    $note = sanitize($_POST['note'] ?? '');
+    $movementDate = sanitize($_POST['movement_date'] ?? '');
+    $employeeId = (int)($_POST['employee_id'] ?? 0) ?: null;
+    $departmentId = (int)($_POST['department_id'] ?? 0) ?: null;
+    $locationId = (int)($_POST['location_id'] ?? 0) ?: null;
+
+    if ($movementId <= 0 || $quantity <= 0) {
+        echo json_encode(['success' => false, 'error' => 'Neplatné hodnoty']);
+        exit;
+    }
+
+    try {
+        // Get the original movement to calculate stock difference
+        $stmt = $db->prepare("SELECT * FROM stock_movements WHERE id = ? AND company_id = ?");
+        $stmt->execute([$movementId, getCurrentCompanyId()]);
+        $original = $stmt->fetch();
+
+        if (!$original) {
+            echo json_encode(['success' => false, 'error' => 'Pohyb nenalezen']);
+            exit;
+        }
+
+        // Calculate quantity difference for stock update
+        $quantityDiff = $quantity - $original['quantity'];
+
+        // Update the movement
+        $stmt = $db->prepare("
+            UPDATE stock_movements SET
+                quantity = ?,
+                note = ?,
+                movement_date = ?,
+                employee_id = ?,
+                department_id = ?,
+                location_id = ?
+            WHERE id = ? AND company_id = ?
+        ");
+        $stmt->execute([
+            $quantity,
+            $note,
+            $movementDate,
+            $employeeId,
+            $departmentId,
+            $locationId,
+            $movementId,
+            getCurrentCompanyId()
+        ]);
+
+        // Update stock if quantity changed
+        if ($quantityDiff != 0) {
+            // For prijem (receipt), add to stock; for vydej (issue), subtract from stock
+            $stockChange = $original['movement_type'] === 'prijem' ? $quantityDiff : -$quantityDiff;
+
+            $stmt = $db->prepare("
+                UPDATE stock SET quantity = quantity + ?
+                WHERE company_id = ? AND item_id = ? AND location_id = ?
+            ");
+            $stmt->execute([
+                $stockChange,
+                getCurrentCompanyId(),
+                $original['item_id'],
+                $original['location_id']
+            ]);
+        }
+
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
 
 // Get filters
 $search = sanitize($_GET['search'] ?? '');
@@ -20,6 +97,15 @@ $employeeFilter = (int)($_GET['employee'] ?? 0);
 $departmentFilter = (int)($_GET['department'] ?? 0);
 $dateFrom = sanitize($_GET['date_from'] ?? '');
 $dateTo = sanitize($_GET['date_to'] ?? '');
+
+// Sorting
+$sortColumn = sanitize($_GET['sort'] ?? 'movement_date');
+$sortDir = sanitize($_GET['dir'] ?? 'desc');
+$allowedSortColumns = ['movement_date', 'movement_type', 'item_name', 'quantity', 'location_name', 'employee_name', 'department_name'];
+if (!in_array($sortColumn, $allowedSortColumns)) {
+    $sortColumn = 'movement_date';
+}
+$sortDir = strtolower($sortDir) === 'asc' ? 'ASC' : 'DESC';
 
 // Pagination
 $page = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
@@ -102,6 +188,19 @@ $stmt->execute($params);
 $totalMovements = $stmt->fetch()['count'];
 $totalPages = ceil($totalMovements / $perPage);
 
+// Build ORDER BY clause
+$orderByMap = [
+    'movement_date' => 'sm.movement_date',
+    'movement_type' => 'sm.movement_type',
+    'item_name' => 'i.name',
+    'quantity' => 'sm.quantity',
+    'location_name' => 'l.name',
+    'employee_name' => 'e.full_name',
+    'department_name' => 'd.name'
+];
+$orderByColumn = $orderByMap[$sortColumn] ?? 'sm.movement_date';
+$orderBySQL = "$orderByColumn $sortDir, sm.created_at DESC";
+
 // Get movements
 $stmt = $db->prepare("
     SELECT
@@ -109,9 +208,9 @@ $stmt = $db->prepare("
         i.name as item_name,
         i.code as item_code,
         i.unit as item_unit,
+        i.pieces_per_package,
         l.name as location_name,
         e.full_name as employee_name,
-        
         d.name as department_name,
         u.full_name as user_name
     FROM stock_movements sm
@@ -121,7 +220,7 @@ $stmt = $db->prepare("
     LEFT JOIN departments d ON sm.department_id = d.id
     LEFT JOIN users u ON sm.user_id = u.id
     WHERE $whereSQL
-    ORDER BY sm.movement_date DESC, sm.created_at DESC
+    ORDER BY $orderBySQL
     LIMIT $perPage OFFSET $offset
 ");
 $stmt->execute($params);
@@ -244,7 +343,7 @@ require __DIR__ . '/../../includes/header.php';
                         <option value="">Všichni zaměstnanci</option>
                         <?php foreach ($employees as $emp): ?>
                             <option value="<?= $emp['id'] ?>" <?= $employeeFilter === $emp['id'] ? 'selected' : '' ?>>
-                                <?= e($emp['full_name']) ?> <?= e($emp) ?>
+                                <?= e($emp['full_name']) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -312,24 +411,56 @@ require __DIR__ . '/../../includes/header.php';
                 <?php endif; ?>
             </div>
         <?php else: ?>
+            <?php
+            // Helper to build sort URL
+            $buildSortUrl = function($column) use ($sortColumn, $sortDir) {
+                $params = $_GET;
+                $params['sort'] = $column;
+                $params['dir'] = ($sortColumn === $column && $sortDir === 'ASC') ? 'desc' : 'asc';
+                unset($params['p']); // Reset to first page on sort change
+                return '?' . http_build_query($params);
+            };
+            $getSortIcon = function($column) use ($sortColumn, $sortDir) {
+                if ($sortColumn !== $column) return '<span class="sort-icon">⇅</span>';
+                return $sortDir === 'ASC' ? '<span class="sort-icon active">↑</span>' : '<span class="sort-icon active">↓</span>';
+            };
+            ?>
             <div class="table-responsive">
-                <table class="table">
+                <table class="table" id="movementsTable">
                     <thead>
                         <tr>
-                            <th>Datum</th>
-                            <th>Typ</th>
-                            <th>Položka</th>
-                            <th>Množství</th>
-                            <th>Sklad</th>
-                            <th>Zaměstnanec</th>
-                            <th>Oddělení</th>
+                            <th class="sortable"><a href="<?= $buildSortUrl('movement_date') ?>">Datum <?= $getSortIcon('movement_date') ?></a></th>
+                            <th class="sortable"><a href="<?= $buildSortUrl('movement_type') ?>">Typ <?= $getSortIcon('movement_type') ?></a></th>
+                            <th class="sortable"><a href="<?= $buildSortUrl('item_name') ?>">Položka <?= $getSortIcon('item_name') ?></a></th>
+                            <th class="sortable"><a href="<?= $buildSortUrl('quantity') ?>">Množství <?= $getSortIcon('quantity') ?></a></th>
+                            <th class="sortable"><a href="<?= $buildSortUrl('location_name') ?>">Sklad <?= $getSortIcon('location_name') ?></a></th>
+                            <th class="sortable"><a href="<?= $buildSortUrl('employee_name') ?>">Zaměstnanec <?= $getSortIcon('employee_name') ?></a></th>
+                            <th class="sortable"><a href="<?= $buildSortUrl('department_name') ?>">Oddělení <?= $getSortIcon('department_name') ?></a></th>
                             <th>Poznámka</th>
                             <th>Zaznamenal</th>
+                            <th>Akce</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($movements as $movement): ?>
-                            <tr class="movement-<?= $movement['movement_type'] ?>">
+                            <?php
+                            $piecesPerPackage = $movement['pieces_per_package'] ?: 1;
+                            $packages = $piecesPerPackage > 1 ? floor($movement['quantity'] / $piecesPerPackage) : 0;
+                            $pieces = $piecesPerPackage > 1 ? $movement['quantity'] % $piecesPerPackage : $movement['quantity'];
+                            ?>
+                            <tr class="movement-<?= $movement['movement_type'] ?>"
+                                data-id="<?= $movement['id'] ?>"
+                                data-quantity="<?= $movement['quantity'] ?>"
+                                data-note="<?= e($movement['note'] ?? '') ?>"
+                                data-date="<?= $movement['movement_date'] ?>"
+                                data-employee-id="<?= $movement['employee_id'] ?? '' ?>"
+                                data-department-id="<?= $movement['department_id'] ?? '' ?>"
+                                data-location-id="<?= $movement['location_id'] ?? '' ?>"
+                                data-item-name="<?= e($movement['item_name']) ?>"
+                                data-item-code="<?= e($movement['item_code']) ?>"
+                                data-item-unit="<?= e($movement['item_unit']) ?>"
+                                data-pieces-per-package="<?= $piecesPerPackage ?>"
+                                data-movement-type="<?= $movement['movement_type'] ?>">
                                 <td>
                                     <strong><?= formatDate($movement['movement_date']) ?></strong>
                                     <br>
@@ -349,6 +480,10 @@ require __DIR__ . '/../../includes/header.php';
                                 </td>
                                 <td>
                                     <strong><?= formatNumber($movement['quantity']) ?></strong> <?= e($movement['item_unit']) ?>
+                                    <?php if ($piecesPerPackage > 1): ?>
+                                        <br>
+                                        <small class="text-muted">(<?= $packages ?> bal + <?= $pieces ?> ks)</small>
+                                    <?php endif; ?>
                                 </td>
                                 <td><?= e($movement['location_name'] ?? '-') ?></td>
                                 <td>
@@ -374,6 +509,9 @@ require __DIR__ . '/../../includes/header.php';
                                 </td>
                                 <td>
                                     <small class="text-muted"><?= e($movement['user_name'] ?? '-') ?></small>
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-secondary edit-movement-btn" title="Upravit">✏️</button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -405,6 +543,96 @@ require __DIR__ . '/../../includes/header.php';
                 </div>
             <?php endif; ?>
         <?php endif; ?>
+    </div>
+</div>
+
+<!-- Edit Movement Modal -->
+<div id="editMovementModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Upravit pohyb</h3>
+            <button type="button" class="modal-close" onclick="closeEditModal()">&times;</button>
+        </div>
+        <form id="editMovementForm">
+            <input type="hidden" name="action" value="update_movement">
+            <input type="hidden" name="movement_id" id="editMovementId">
+
+            <div class="modal-body">
+                <div class="movement-info">
+                    <span id="editMovementType" class="badge"></span>
+                    <strong id="editItemCode"></strong> - <span id="editItemName"></span>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Datum pohybu</label>
+                        <input type="date" name="movement_date" id="editMovementDate" class="form-control" required>
+                    </div>
+                </div>
+
+                <div class="form-row" id="packageInputRow" style="display: none;">
+                    <div class="form-group">
+                        <label>Množství v balení (bal)</label>
+                        <input type="number" id="editPackages" class="form-control" min="0" step="1" value="0">
+                        <small class="text-muted">1 bal = <span id="piecesPerPackageInfo">0</span> ks</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Množství kusů (ks)</label>
+                        <input type="number" id="editPieces" class="form-control" min="0" step="1" value="0">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Celkové množství (<span id="editItemUnit">ks</span>)</label>
+                        <input type="number" name="quantity" id="editQuantity" class="form-control" min="0.001" step="0.001" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Sklad</label>
+                        <select name="location_id" id="editLocationId" class="form-control">
+                            <option value="">-- Vyberte sklad --</option>
+                            <?php foreach ($locations as $loc): ?>
+                                <option value="<?= $loc['id'] ?>"><?= e($loc['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Zaměstnanec</label>
+                        <select name="employee_id" id="editEmployeeId" class="form-control">
+                            <option value="">-- Vyberte zaměstnance --</option>
+                            <?php foreach ($employees as $emp): ?>
+                                <option value="<?= $emp['id'] ?>"><?= e($emp['full_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Oddělení</label>
+                        <select name="department_id" id="editDepartmentId" class="form-control">
+                            <option value="">-- Vyberte oddělení --</option>
+                            <?php foreach ($departments as $dept): ?>
+                                <option value="<?= $dept['id'] ?>"><?= e($dept['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Poznámka</label>
+                    <textarea name="note" id="editNote" class="form-control" rows="2"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Zrušit</button>
+                <button type="submit" class="btn btn-primary">Uložit změny</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -483,6 +711,259 @@ require __DIR__ . '/../../includes/header.php';
     background: #2563eb;
     color: white;
 }
+
+/* Sortable columns */
+th.sortable a {
+    color: inherit;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+th.sortable a:hover {
+    color: #2563eb;
+}
+
+.sort-icon {
+    opacity: 0.3;
+    font-size: 0.75rem;
+}
+
+.sort-icon.active {
+    opacity: 1;
+    color: #2563eb;
+}
+
+/* Modal styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+}
+
+.modal-close:hover {
+    color: #111827;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-body .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.modal-body .form-group {
+    margin-bottom: 1rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.movement-info {
+    background: #f3f4f6;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.edit-movement-btn {
+    opacity: 0.7;
+}
+
+.edit-movement-btn:hover {
+    opacity: 1;
+}
 </style>
+
+<script>
+let currentPiecesPerPackage = 1;
+
+function openEditModal(row) {
+    const modal = document.getElementById('editMovementModal');
+    const data = row.dataset;
+
+    document.getElementById('editMovementId').value = data.id;
+    document.getElementById('editMovementDate').value = data.date;
+    document.getElementById('editQuantity').value = data.quantity;
+    document.getElementById('editNote').value = data.note || '';
+    document.getElementById('editLocationId').value = data.locationId || '';
+    document.getElementById('editEmployeeId').value = data.employeeId || '';
+    document.getElementById('editDepartmentId').value = data.departmentId || '';
+    document.getElementById('editItemCode').textContent = data.itemCode;
+    document.getElementById('editItemName').textContent = data.itemName;
+    document.getElementById('editItemUnit').textContent = data.itemUnit;
+
+    // Set movement type badge
+    const typeEl = document.getElementById('editMovementType');
+    if (data.movementType === 'prijem') {
+        typeEl.textContent = '➕ Příjem';
+        typeEl.className = 'badge badge-success';
+    } else {
+        typeEl.textContent = '➖ Výdej';
+        typeEl.className = 'badge badge-primary';
+    }
+
+    // Handle package input
+    currentPiecesPerPackage = parseInt(data.piecesPerPackage) || 1;
+    const packageRow = document.getElementById('packageInputRow');
+    if (currentPiecesPerPackage > 1) {
+        packageRow.style.display = 'grid';
+        document.getElementById('piecesPerPackageInfo').textContent = currentPiecesPerPackage;
+
+        const quantity = parseFloat(data.quantity);
+        const packages = Math.floor(quantity / currentPiecesPerPackage);
+        const pieces = quantity % currentPiecesPerPackage;
+
+        document.getElementById('editPackages').value = packages;
+        document.getElementById('editPieces').value = pieces;
+    } else {
+        packageRow.style.display = 'none';
+    }
+
+    modal.classList.add('show');
+}
+
+function closeEditModal() {
+    document.getElementById('editMovementModal').classList.remove('show');
+}
+
+function updateQuantityFromPackages() {
+    if (currentPiecesPerPackage <= 1) return;
+
+    const packages = parseInt(document.getElementById('editPackages').value) || 0;
+    const pieces = parseInt(document.getElementById('editPieces').value) || 0;
+    const total = (packages * currentPiecesPerPackage) + pieces;
+
+    document.getElementById('editQuantity').value = total;
+}
+
+// Event listeners for package/pieces inputs
+document.getElementById('editPackages').addEventListener('input', updateQuantityFromPackages);
+document.getElementById('editPieces').addEventListener('input', updateQuantityFromPackages);
+
+// Also update packages when quantity is changed directly
+document.getElementById('editQuantity').addEventListener('input', function() {
+    if (currentPiecesPerPackage <= 1) return;
+
+    const quantity = parseFloat(this.value) || 0;
+    const packages = Math.floor(quantity / currentPiecesPerPackage);
+    const pieces = quantity % currentPiecesPerPackage;
+
+    document.getElementById('editPackages').value = packages;
+    document.getElementById('editPieces').value = Math.round(pieces);
+});
+
+// Edit button click handlers
+document.querySelectorAll('.edit-movement-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const row = this.closest('tr');
+        openEditModal(row);
+    });
+});
+
+// Close modal when clicking outside
+document.getElementById('editMovementModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeEditModal();
+    }
+});
+
+// Close modal on escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeEditModal();
+    }
+});
+
+// Form submission
+document.getElementById('editMovementForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Ukládám...';
+
+    try {
+        const response = await fetch(window.location.href, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Reload the page to show updated data
+            window.location.reload();
+        } else {
+            alert('Chyba: ' + (result.error || 'Nepodařilo se uložit změny'));
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    } catch (error) {
+        alert('Chyba při ukládání: ' + error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    }
+});
+</script>
 
 <?php require __DIR__ . '/../../includes/footer.php'; ?>
