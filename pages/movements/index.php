@@ -16,21 +16,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     header('Content-Type: application/json');
 
     $movementId = (int)($_POST['movement_id'] ?? 0);
-    $quantity = (float)($_POST['quantity'] ?? 0);
+    $quantity = (int)($_POST['quantity'] ?? 0);  // pieces (ks)
+    $quantityPackages = (float)($_POST['quantity_packages'] ?? 0);  // packages (bal)
     $note = sanitize($_POST['note'] ?? '');
     $movementDate = sanitize($_POST['movement_date'] ?? '');
     $employeeId = (int)($_POST['employee_id'] ?? 0) ?: null;
     $departmentId = (int)($_POST['department_id'] ?? 0) ?: null;
     $locationId = (int)($_POST['location_id'] ?? 0) ?: null;
 
-    if ($movementId <= 0 || $quantity <= 0) {
+    if ($movementId <= 0 || ($quantity <= 0 && $quantityPackages <= 0)) {
         echo json_encode(['success' => false, 'error' => 'Neplatné hodnoty']);
         exit;
     }
 
     try {
-        // Get the original movement to calculate stock difference
-        $stmt = $db->prepare("SELECT * FROM stock_movements WHERE id = ? AND company_id = ?");
+        // Get the original movement and item info to calculate stock difference
+        $stmt = $db->prepare("
+            SELECT sm.*, i.pieces_per_package
+            FROM stock_movements sm
+            INNER JOIN items i ON sm.item_id = i.id
+            WHERE sm.id = ? AND sm.company_id = ?
+        ");
         $stmt->execute([$movementId, getCurrentCompanyId()]);
         $original = $stmt->fetch();
 
@@ -39,13 +45,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             exit;
         }
 
-        // Calculate quantity difference for stock update
-        $quantityDiff = $quantity - $original['quantity'];
+        $piecesPerPackage = $original['pieces_per_package'] ?: 1;
+
+        // Calculate total quantities in pieces for stock update
+        $oldTotalPieces = ((float)$original['quantity_packages'] * $piecesPerPackage) + (int)$original['quantity'];
+        $newTotalPieces = ($quantityPackages * $piecesPerPackage) + $quantity;
+        $quantityDiff = $newTotalPieces - $oldTotalPieces;
 
         // Update the movement
         $stmt = $db->prepare("
             UPDATE stock_movements SET
                 quantity = ?,
+                quantity_packages = ?,
                 note = ?,
                 movement_date = ?,
                 employee_id = ?,
@@ -55,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         ");
         $stmt->execute([
             $quantity,
+            $quantityPackages,
             $note,
             $movementDate,
             $employeeId,
@@ -64,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             getCurrentCompanyId()
         ]);
 
-        // Update stock if quantity changed
+        // Update stock if total quantity changed
         if ($quantityDiff != 0) {
             // For prijem (receipt), add to stock; for vydej (issue), subtract from stock
             $stockChange = $original['movement_type'] === 'prijem' ? $quantityDiff : -$quantityDiff;
@@ -444,13 +456,17 @@ require __DIR__ . '/../../includes/header.php';
                     <tbody>
                         <?php foreach ($movements as $movement): ?>
                             <?php
+                            // Use quantity_packages from movement record, and pieces_per_package from item
                             $piecesPerPackage = $movement['pieces_per_package'] ?: 1;
-                            $packages = $piecesPerPackage > 1 ? floor($movement['quantity'] / $piecesPerPackage) : 0;
-                            $pieces = $piecesPerPackage > 1 ? $movement['quantity'] % $piecesPerPackage : $movement['quantity'];
+                            $packages = (float)($movement['quantity_packages'] ?? 0);
+                            $pieces = (int)($movement['quantity'] ?? 0);
+                            // Calculate total quantity in pieces
+                            $totalQuantity = ($packages * $piecesPerPackage) + $pieces;
                             ?>
                             <tr class="movement-<?= $movement['movement_type'] ?>"
                                 data-id="<?= $movement['id'] ?>"
-                                data-quantity="<?= $movement['quantity'] ?>"
+                                data-quantity="<?= $pieces ?>"
+                                data-quantity-packages="<?= $packages ?>"
                                 data-note="<?= e($movement['note'] ?? '') ?>"
                                 data-date="<?= $movement['movement_date'] ?>"
                                 data-employee-id="<?= $movement['employee_id'] ?? '' ?>"
@@ -479,10 +495,10 @@ require __DIR__ . '/../../includes/header.php';
                                     <?= e($movement['item_name']) ?>
                                 </td>
                                 <td>
-                                    <strong><?= formatNumber($movement['quantity']) ?></strong> <?= e($movement['item_unit']) ?>
-                                    <?php if ($piecesPerPackage > 1): ?>
+                                    <strong><?= formatNumber($totalQuantity) ?></strong> <?= e($movement['item_unit']) ?>
+                                    <?php if ($piecesPerPackage > 1 && ($packages > 0 || $pieces > 0)): ?>
                                         <br>
-                                        <small class="text-muted">(<?= $packages ?> bal + <?= $pieces ?> ks)</small>
+                                        <small class="text-muted">(<?= formatNumber($packages) ?> bal + <?= $pieces ?> ks)</small>
                                     <?php endif; ?>
                                 </td>
                                 <td><?= e($movement['location_name'] ?? '-') ?></td>
@@ -556,6 +572,8 @@ require __DIR__ . '/../../includes/header.php';
         <form id="editMovementForm">
             <input type="hidden" name="action" value="update_movement">
             <input type="hidden" name="movement_id" id="editMovementId">
+            <input type="hidden" name="quantity" id="editQuantityHidden">
+            <input type="hidden" name="quantity_packages" id="editQuantityPackagesHidden">
 
             <div class="modal-body">
                 <div class="movement-info">
@@ -570,10 +588,10 @@ require __DIR__ . '/../../includes/header.php';
                     </div>
                 </div>
 
-                <div class="form-row" id="packageInputRow" style="display: none;">
+                <div class="form-row" id="packageInputRow">
                     <div class="form-group">
                         <label>Množství v balení (bal)</label>
-                        <input type="number" id="editPackages" class="form-control" min="0" step="1" value="0">
+                        <input type="number" id="editPackages" class="form-control" min="0" step="0.01" value="0">
                         <small class="text-muted">1 bal = <span id="piecesPerPackageInfo">0</span> ks</small>
                     </div>
                     <div class="form-group">
@@ -585,7 +603,8 @@ require __DIR__ . '/../../includes/header.php';
                 <div class="form-row">
                     <div class="form-group">
                         <label>Celkové množství (<span id="editItemUnit">ks</span>)</label>
-                        <input type="number" name="quantity" id="editQuantity" class="form-control" min="0.001" step="0.001" required>
+                        <input type="number" id="editQuantityDisplay" class="form-control" min="0" step="1" readonly>
+                        <small class="text-muted">Pouze pro informaci - upravte bal/ks výše</small>
                     </div>
                 </div>
 
@@ -840,7 +859,6 @@ function openEditModal(row) {
 
     document.getElementById('editMovementId').value = data.id;
     document.getElementById('editMovementDate').value = data.date;
-    document.getElementById('editQuantity').value = data.quantity;
     document.getElementById('editNote').value = data.note || '';
     document.getElementById('editLocationId').value = data.locationId || '';
     document.getElementById('editEmployeeId').value = data.employeeId || '';
@@ -859,22 +877,17 @@ function openEditModal(row) {
         typeEl.className = 'badge badge-primary';
     }
 
-    // Handle package input
+    // Get packages and pieces from data attributes (stored separately in DB)
     currentPiecesPerPackage = parseInt(data.piecesPerPackage) || 1;
-    const packageRow = document.getElementById('packageInputRow');
-    if (currentPiecesPerPackage > 1) {
-        packageRow.style.display = 'grid';
-        document.getElementById('piecesPerPackageInfo').textContent = currentPiecesPerPackage;
+    const packages = parseFloat(data.quantityPackages) || 0;
+    const pieces = parseInt(data.quantity) || 0;
 
-        const quantity = parseFloat(data.quantity);
-        const packages = Math.floor(quantity / currentPiecesPerPackage);
-        const pieces = quantity % currentPiecesPerPackage;
+    document.getElementById('piecesPerPackageInfo').textContent = currentPiecesPerPackage;
+    document.getElementById('editPackages').value = packages;
+    document.getElementById('editPieces').value = pieces;
 
-        document.getElementById('editPackages').value = packages;
-        document.getElementById('editPieces').value = pieces;
-    } else {
-        packageRow.style.display = 'none';
-    }
+    // Update the hidden fields and display
+    updateQuantityFields();
 
     modal.classList.add('show');
 }
@@ -883,31 +896,22 @@ function closeEditModal() {
     document.getElementById('editMovementModal').classList.remove('show');
 }
 
-function updateQuantityFromPackages() {
-    if (currentPiecesPerPackage <= 1) return;
-
-    const packages = parseInt(document.getElementById('editPackages').value) || 0;
+function updateQuantityFields() {
+    const packages = parseFloat(document.getElementById('editPackages').value) || 0;
     const pieces = parseInt(document.getElementById('editPieces').value) || 0;
     const total = (packages * currentPiecesPerPackage) + pieces;
 
-    document.getElementById('editQuantity').value = total;
+    // Update hidden fields that will be submitted
+    document.getElementById('editQuantityHidden').value = pieces;
+    document.getElementById('editQuantityPackagesHidden').value = packages;
+
+    // Update display field
+    document.getElementById('editQuantityDisplay').value = total;
 }
 
 // Event listeners for package/pieces inputs
-document.getElementById('editPackages').addEventListener('input', updateQuantityFromPackages);
-document.getElementById('editPieces').addEventListener('input', updateQuantityFromPackages);
-
-// Also update packages when quantity is changed directly
-document.getElementById('editQuantity').addEventListener('input', function() {
-    if (currentPiecesPerPackage <= 1) return;
-
-    const quantity = parseFloat(this.value) || 0;
-    const packages = Math.floor(quantity / currentPiecesPerPackage);
-    const pieces = quantity % currentPiecesPerPackage;
-
-    document.getElementById('editPackages').value = packages;
-    document.getElementById('editPieces').value = Math.round(pieces);
-});
+document.getElementById('editPackages').addEventListener('input', updateQuantityFields);
+document.getElementById('editPieces').addEventListener('input', updateQuantityFields);
 
 // Edit button click handlers
 document.querySelectorAll('.edit-movement-btn').forEach(btn => {
@@ -934,6 +938,9 @@ document.addEventListener('keydown', function(e) {
 // Form submission
 document.getElementById('editMovementForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+
+    // Ensure hidden fields are up to date
+    updateQuantityFields();
 
     const formData = new FormData(this);
     const submitBtn = this.querySelector('button[type="submit"]');
