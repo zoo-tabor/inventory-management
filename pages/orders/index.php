@@ -916,19 +916,11 @@ require __DIR__ . '/../../includes/header.php';
     background-color: #dbeafe;
 }
 
-/* Sticky table header */
-.table-responsive {
-    max-height: 70vh;
-    overflow-y: auto;
-}
-
-.table thead {
+/* Sticky table header - uses page scroll, header sticks to top */
+.table thead th {
     position: sticky;
     top: 0;
     z-index: 10;
-}
-
-.table thead th {
     background: #f9fafb;
     box-shadow: 0 1px 0 #e5e7eb;
 }
