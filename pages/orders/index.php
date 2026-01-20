@@ -217,7 +217,7 @@ if ($viewMode === 'nizky_stav') {
         LEFT JOIN stock s ON i.id = s.item_id
         WHERE $whereSQL
         GROUP BY i.id
-        HAVING COALESCE(SUM(s.quantity), 0) <= i.minimum_stock
+        HAVING COALESCE(SUM(s.quantity), 0) < i.optimal_stock
         ORDER BY $orderBySQL
     ");
     $stmt->execute($params);
@@ -226,10 +226,11 @@ if ($viewMode === 'nizky_stav') {
     // Filter by status
     foreach ($allItems as $item) {
         $stockStatus = getStockStatus($item['current_stock'], $item['minimum_stock']);
+        $isBelowOptimal = $item['current_stock'] < $item['optimal_stock'];
 
         if ($statusFilter === 'all' ||
             ($statusFilter === 'critical' && $stockStatus === STOCK_STATUS_CRITICAL) ||
-            ($statusFilter === 'low' && $stockStatus === STOCK_STATUS_LOW)) {
+            ($statusFilter === 'low' && ($stockStatus === STOCK_STATUS_LOW || $isBelowOptimal))) {
             $items[] = $item;
         }
     }
@@ -240,7 +241,8 @@ if ($viewMode === 'nizky_stav') {
     foreach ($items as $item) {
         $stockStatus = getStockStatus($item['current_stock'], $item['minimum_stock']);
         if ($stockStatus === STOCK_STATUS_CRITICAL) $criticalCount++;
-        if ($stockStatus === STOCK_STATUS_LOW) $lowCount++;
+        // Count as "low" if below minimum OR below optimal
+        if ($stockStatus === STOCK_STATUS_LOW || $item['current_stock'] < $item['optimal_stock']) $lowCount++;
 
         if ($item['price'] && $item['needed_quantity'] > 0) {
             $totalValue += $item['price'] * $item['needed_quantity'];
