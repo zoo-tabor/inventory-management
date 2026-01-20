@@ -21,8 +21,17 @@ $statusFilter = sanitize($_GET['status'] ?? 'low'); // low, critical, all
 $sortBy = sanitize($_GET['sort'] ?? 'priority'); // priority, name, quantity
 
 // Consumption view specific filters
-$consumptionPeriod = (int)($_GET['period'] ?? 12); // months to calculate average from
+$consumptionDateFrom = sanitize($_GET['date_from'] ?? '');
+$consumptionDateTo = sanitize($_GET['date_to'] ?? '');
 $defaultOrderMonths = (int)($_GET['order_months'] ?? 0); // 0 = use item's order_months
+
+// Default date range: last 12 months if not specified
+if (empty($consumptionDateFrom)) {
+    $consumptionDateFrom = date('Y-m-d', strtotime('-12 months'));
+}
+if (empty($consumptionDateTo)) {
+    $consumptionDateTo = date('Y-m-d');
+}
 
 // Get categories
 $stmt = $db->prepare("SELECT id, name FROM categories WHERE company_id = ? ORDER BY name");
@@ -56,9 +65,15 @@ $consumptionStats = [
 ];
 
 if ($viewMode === 'spotreba') {
-    // Calculate the date range for consumption period
-    $periodEndDate = date('Y-m-d');
-    $periodStartDate = date('Y-m-d', strtotime("-{$consumptionPeriod} months"));
+    // Use the date range from filters
+    $periodStartDate = $consumptionDateFrom;
+    $periodEndDate = $consumptionDateTo;
+
+    // Calculate number of months in the period for average calculation
+    $startDateTime = new DateTime($periodStartDate);
+    $endDateTime = new DateTime($periodEndDate);
+    $interval = $startDateTime->diff($endDateTime);
+    $consumptionMonths = max(1, ($interval->y * 12) + $interval->m + ($interval->d / 30));
 
     // Get all items with their consumption data and current stock
     $stmt = $db->prepare("
@@ -78,8 +93,9 @@ if ($viewMode === 'spotreba') {
         LEFT JOIN (
             SELECT
                 sm.item_id,
-                SUM(sm.quantity) as total_consumed
+                SUM(COALESCE(sm.quantity_packages, 0) * COALESCE(i2.pieces_per_package, 1) + COALESCE(sm.quantity, 0)) as total_consumed
             FROM stock_movements sm
+            INNER JOIN items i2 ON sm.item_id = i2.id
             WHERE sm.company_id = ?
               AND sm.movement_type = 'vydej'
               AND sm.movement_date >= ?
@@ -91,7 +107,7 @@ if ($viewMode === 'spotreba') {
     ");
 
     $consumptionParams = array_merge(
-        [$consumptionPeriod, getCurrentCompanyId(), $periodStartDate, $periodEndDate],
+        [$consumptionMonths, getCurrentCompanyId(), $periodStartDate, $periodEndDate],
         $params
     );
     $stmt->execute($consumptionParams);
@@ -324,13 +340,13 @@ require __DIR__ . '/../../includes/header.php';
                     </div>
 
                     <div class="form-group">
-                        <label>Spotřeba za období</label>
-                        <select name="period" class="form-control">
-                            <option value="3" <?= $consumptionPeriod === 3 ? 'selected' : '' ?>>Posledních 3 měsíce</option>
-                            <option value="6" <?= $consumptionPeriod === 6 ? 'selected' : '' ?>>Posledních 6 měsíců</option>
-                            <option value="12" <?= $consumptionPeriod === 12 ? 'selected' : '' ?>>Posledních 12 měsíců</option>
-                            <option value="24" <?= $consumptionPeriod === 24 ? 'selected' : '' ?>>Posledních 24 měsíců</option>
-                        </select>
+                        <label>Spotřeba od</label>
+                        <input type="date" name="date_from" class="form-control" value="<?= e($consumptionDateFrom) ?>">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Spotřeba do</label>
+                        <input type="date" name="date_to" class="form-control" value="<?= e($consumptionDateTo) ?>">
                     </div>
 
                     <div class="form-group">
@@ -371,7 +387,7 @@ require __DIR__ . '/../../includes/header.php';
         <div class="card-header">
             <h2>Návrhy objednávek dle spotřeby</h2>
             <small class="text-muted">
-                Průměrná spotřeba počítána z období: <?= formatDate($periodStartDate) ?> - <?= formatDate($periodEndDate) ?>
+                Průměrná spotřeba počítána z období: <?= formatDate($periodStartDate) ?> - <?= formatDate($periodEndDate) ?> (<?= formatNumber($consumptionMonths, 1) ?> měs.)
             </small>
         </div>
         <div class="card-body">
@@ -834,7 +850,7 @@ require __DIR__ . '/../../includes/header.php';
 }
 
 .filter-form .form-row-consumption {
-    grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr auto;
+    grid-template-columns: 1.2fr 1.2fr 1fr 1fr 1fr 1fr auto;
 }
 
 .card-header {
