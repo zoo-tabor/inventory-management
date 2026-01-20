@@ -477,7 +477,7 @@ include __DIR__ . '/../../includes/header.php';
 
                     <div class="form-group">
                         <label for="price">Cena (Kč)</label>
-                        <input type="number" id="price" name="price" class="form-control" step="0.01" min="0">
+                        <input type="number" id="price" name="price" class="form-control" step="0.0001" min="0">
                     </div>
                 </div>
 
