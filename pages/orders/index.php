@@ -697,8 +697,8 @@ require __DIR__ . '/../../includes/header.php';
                                         <strong class="text-success"><?= formatNumber($orderQuantity) ?></strong> <?= e($item['unit']) ?>
                                         <?php if ($item['pieces_per_package'] > 1): ?>
                                             <br>
-                                            <small class="text-muted">
-                                                (<?= formatNumber(piecesToPackages($orderQuantity, $item['pieces_per_package']), 2) ?> bal)
+                                            <small class="text-primary">
+                                                (<?= $orderPackages ?> bal)
                                             </small>
                                         <?php endif; ?>
                                     </td>
