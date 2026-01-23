@@ -88,19 +88,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         exit;
     }
 
-    $locationId = (int)$_POST['location_id'];
     $items = json_decode($_POST['items'], true);
     $note = sanitize($_POST['note'] ?? '');
     $movementDate = sanitize($_POST['movement_date'] ?? date('Y-m-d'));
 
-    if (!$locationId) {
-        echo json_encode(['success' => false, 'error' => 'Vyberte sklad.'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
     if (empty($items)) {
         echo json_encode(['success' => false, 'error' => 'Žádné položky k importu.'], JSON_UNESCAPED_UNICODE);
         exit;
+    }
+
+    // Validate all items have location_id
+    foreach ($items as $item) {
+        if (empty($item['location_id'])) {
+            echo json_encode(['success' => false, 'error' => 'Všechny položky musí mít vybraný sklad.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
     }
 
     try {
@@ -111,10 +113,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         foreach ($items as $item) {
             $itemId = (int)$item['item_id'];
+            $locationId = (int)$item['location_id'];
             $packages = (float)$item['packages'];
             $piecesInPackages = (int)$item['total_pieces'];
 
-            if ($packages <= 0) continue;
+            if ($packages <= 0 || !$locationId) continue;
 
             // Insert movement record (storing packages in quantity_packages)
             $stmt = $db->prepare("
@@ -216,9 +219,9 @@ require __DIR__ . '/../../includes/header.php';
 
             <div class="form-row">
                 <div class="form-group">
-                    <label for="location_id" class="required">Sklad</label>
-                    <select name="location_id" id="location_id" class="form-control" required>
-                        <option value="">-- Vyberte sklad --</option>
+                    <label for="default_location_id">Výchozí sklad (pro všechny)</label>
+                    <select id="default_location_id" class="form-control" onchange="applyDefaultLocation()">
+                        <option value="">-- Ponechat jednotlivě --</option>
                         <?php foreach ($locations as $location): ?>
                             <option value="<?= $location['id'] ?>">
                                 <?= e($location['name']) ?> (<?= e($location['code']) ?>)
@@ -262,6 +265,7 @@ require __DIR__ . '/../../includes/header.php';
                         <tr>
                             <th>Kód</th>
                             <th>Název</th>
+                            <th>Sklad</th>
                             <th>Balení (bal)</th>
                             <th>Celkem (ks)</th>
                             <th>Akce</th>
@@ -340,6 +344,15 @@ require __DIR__ . '/../../includes/header.php';
 #itemsTable input[type="number"] {
     width: 80px;
     text-align: center;
+}
+
+#itemsTable select {
+    min-width: 140px;
+}
+
+.form-control-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
 }
 
 .summary-row {
@@ -464,6 +477,14 @@ async function parseInput() {
     }
 }
 
+// Location options HTML for reuse
+const locationOptionsHtml = `
+    <option value="">-- Vyberte --</option>
+    <?php foreach ($locations as $location): ?>
+    <option value="<?= $location['id'] ?>"><?= e($location['name']) ?></option>
+    <?php endforeach; ?>
+`;
+
 function renderItemsTable() {
     const tbody = document.getElementById('itemsBody');
     tbody.innerHTML = '';
@@ -473,6 +494,11 @@ function renderItemsTable() {
         tr.innerHTML = `
             <td><strong>${escapeHtml(item.code)}</strong></td>
             <td>${escapeHtml(item.name)}</td>
+            <td>
+                <select id="location-${index}" class="form-control form-control-sm" onchange="updateLocation(${index}, this.value)">
+                    ${locationOptionsHtml}
+                </select>
+            </td>
             <td>
                 <input type="number"
                        value="${item.packages}"
@@ -488,9 +514,31 @@ function renderItemsTable() {
             </td>
         `;
         tbody.appendChild(tr);
+
+        // Set location if already defined
+        if (item.location_id) {
+            document.getElementById(`location-${index}`).value = item.location_id;
+        }
     });
 
     updateSummary();
+}
+
+function updateLocation(index, value) {
+    parsedItems[index].location_id = value ? parseInt(value) : null;
+}
+
+function applyDefaultLocation() {
+    const defaultLocationId = document.getElementById('default_location_id').value;
+    if (!defaultLocationId) return;
+
+    parsedItems.forEach((item, index) => {
+        item.location_id = parseInt(defaultLocationId);
+        const select = document.getElementById(`location-${index}`);
+        if (select) {
+            select.value = defaultLocationId;
+        }
+    });
 }
 
 function updatePackages(index, value) {
@@ -519,20 +567,21 @@ function goBack() {
 }
 
 async function submitImport() {
-    const locationId = document.getElementById('location_id').value;
     const movementDate = document.getElementById('movement_date').value;
     const note = document.getElementById('note').value;
-
-    if (!locationId) {
-        alert('Vyberte sklad.');
-        return;
-    }
 
     // Filter out items with 0 packages
     const itemsToImport = parsedItems.filter(i => i.packages > 0);
 
     if (itemsToImport.length === 0) {
         alert('Žádné položky k importu.');
+        return;
+    }
+
+    // Validate that all items have locations
+    const itemsWithoutLocation = itemsToImport.filter(i => !i.location_id);
+    if (itemsWithoutLocation.length > 0) {
+        alert(`${itemsWithoutLocation.length} položek nemá vybraný sklad. Vyberte sklad pro všechny položky.`);
         return;
     }
 
@@ -546,7 +595,6 @@ async function submitImport() {
         const formData = new FormData();
         formData.append('action', 'import');
         formData.append('csrf_token', csrfToken);
-        formData.append('location_id', locationId);
         formData.append('movement_date', movementDate);
         formData.append('note', note);
         formData.append('items', JSON.stringify(itemsToImport));
