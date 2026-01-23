@@ -135,6 +135,7 @@ require __DIR__ . '/../../includes/header.php';
 <div class="page-header">
     <h1>➕ <?= e($pageTitle) ?></h1>
     <div class="page-actions">
+        <a href="<?= url('movements/hromadny-prijem') ?>" class="btn btn-success">📦 Hromadný příjem</a>
         <a href="<?= url('movements') ?>" class="btn btn-secondary">📋 Historie pohybů</a>
         <a href="<?= url('stock') ?>" class="btn btn-secondary">📦 Přehled skladu</a>
     </div>
@@ -149,12 +150,20 @@ require __DIR__ . '/../../includes/header.php';
                 <!-- Item Selection -->
                 <div class="form-group">
                     <label for="item_id" class="required">Položka</label>
+                    <input
+                        type="text"
+                        id="item_search"
+                        class="form-control"
+                        placeholder="Začněte psát kód nebo název položky..."
+                        autocomplete="off"
+                    >
                     <select
                         name="item_id"
                         id="item_id"
                         class="form-control"
                         required
                         onchange="handleItemChange()"
+                        style="display: none;"
                     >
                         <option value="">-- Vyberte položku --</option>
                         <?php foreach ($items as $item): ?>
@@ -164,6 +173,7 @@ require __DIR__ . '/../../includes/header.php';
                                 data-pieces-per-package="<?= $item['pieces_per_package'] ?>"
                                 data-current-stock="<?= $item['current_stock'] ?>"
                                 data-minimum-stock="<?= $item['minimum_stock'] ?>"
+                                data-search-text="<?= e(strtolower($item['code'] . ' ' . $item['name'])) ?>"
                                 <?= $preselectedItem === $item['id'] ? 'selected' : '' ?>
                             >
                                 <?= e($item['code']) ?> - <?= e($item['name']) ?>
@@ -171,6 +181,7 @@ require __DIR__ . '/../../includes/header.php';
                             </option>
                         <?php endforeach; ?>
                     </select>
+                    <div id="item_dropdown" class="search-dropdown" style="display: none;"></div>
                 </div>
 
                 <!-- Location Selection -->
@@ -320,6 +331,43 @@ require __DIR__ . '/../../includes/header.php';
     padding-top: 1rem;
     border-top: 1px solid #e5e7eb;
 }
+
+.form-group {
+    position: relative;
+}
+
+.search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.search-dropdown-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.search-dropdown-item:hover {
+    background: #f9fafb;
+}
+
+.search-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.search-dropdown-item.selected {
+    background: #e0f2fe;
+}
 </style>
 
 <script>
@@ -412,6 +460,133 @@ function formatNumber(num, decimals = 0) {
 if (document.getElementById('item_id').value) {
     handleItemChange();
 }
+
+// Item search functionality
+const itemSearchInput = document.getElementById('item_search');
+const itemSelect = document.getElementById('item_id');
+const itemDropdown = document.getElementById('item_dropdown');
+let selectedItemIndex = -1;
+let filteredItems = [];
+
+// Initialize with preselected item
+if (itemSelect.value) {
+    const selectedOption = itemSelect.options[itemSelect.selectedIndex];
+    if (selectedOption) {
+        itemSearchInput.value = selectedOption.textContent.trim();
+    }
+}
+
+itemSearchInput.addEventListener('focus', function() {
+    // Show all items on focus if no search text
+    showItemDropdown(this.value);
+});
+
+itemSearchInput.addEventListener('input', function(e) {
+    showItemDropdown(e.target.value);
+});
+
+function showItemDropdown(searchText) {
+    searchText = searchText.toLowerCase().trim();
+
+    // Filter items
+    filteredItems = [];
+    const options = itemSelect.querySelectorAll('option');
+
+    options.forEach((option, index) => {
+        if (index === 0) return; // Skip the placeholder
+        const optionSearchText = option.getAttribute('data-search-text') || '';
+        const optionDisplayText = option.textContent.trim().toLowerCase();
+
+        if (!searchText || optionSearchText.includes(searchText) || optionDisplayText.includes(searchText)) {
+            filteredItems.push({
+                value: option.value,
+                text: option.textContent.trim(),
+                unit: option.dataset.unit,
+                piecesPerPackage: option.dataset.piecesPerPackage,
+                currentStock: option.dataset.currentStock,
+                minimumStock: option.dataset.minimumStock,
+                element: option
+            });
+        }
+    });
+
+    // Display filtered results
+    if (filteredItems.length > 0) {
+        let html = '';
+        filteredItems.forEach((item, index) => {
+            html += `<div class="search-dropdown-item" data-index="${index}">${item.text}</div>`;
+        });
+        itemDropdown.innerHTML = html;
+        itemDropdown.style.display = 'block';
+        selectedItemIndex = -1;
+    } else {
+        itemDropdown.innerHTML = '<div class="search-dropdown-item" style="color: #999;">Žádná položka nenalezena</div>';
+        itemDropdown.style.display = 'block';
+    }
+}
+
+itemSearchInput.addEventListener('keydown', function(e) {
+    const items = itemDropdown.querySelectorAll('.search-dropdown-item[data-index]');
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (selectedItemIndex < filteredItems.length - 1) {
+            selectedItemIndex++;
+            updateSelectedItemHighlight(items);
+        }
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (selectedItemIndex > 0) {
+            selectedItemIndex--;
+            updateSelectedItemHighlight(items);
+        }
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (selectedItemIndex >= 0 && filteredItems[selectedItemIndex]) {
+            selectItemFromDropdown(filteredItems[selectedItemIndex]);
+        }
+    } else if (e.key === 'Escape') {
+        itemDropdown.style.display = 'none';
+        selectedItemIndex = -1;
+    }
+});
+
+function updateSelectedItemHighlight(items) {
+    items.forEach((item, index) => {
+        if (index === selectedItemIndex) {
+            item.classList.add('selected');
+            item.scrollIntoView({ block: 'nearest' });
+        } else {
+            item.classList.remove('selected');
+        }
+    });
+}
+
+itemDropdown.addEventListener('click', function(e) {
+    const item = e.target.closest('.search-dropdown-item');
+    if (item && item.hasAttribute('data-index')) {
+        const index = parseInt(item.getAttribute('data-index'));
+        selectItemFromDropdown(filteredItems[index]);
+    }
+});
+
+function selectItemFromDropdown(item) {
+    itemSelect.value = item.value;
+    itemSearchInput.value = item.text;
+    itemDropdown.style.display = 'none';
+    selectedItemIndex = -1;
+
+    // Trigger the item change handler
+    handleItemChange();
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    if (!itemSearchInput.contains(e.target) && !itemDropdown.contains(e.target)) {
+        itemDropdown.style.display = 'none';
+        selectedItemIndex = -1;
+    }
+});
 </script>
 
 <?php require __DIR__ . '/../../includes/footer.php'; ?>
