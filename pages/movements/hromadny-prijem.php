@@ -31,11 +31,12 @@ foreach ($allItems as $item) {
 
 // Handle AJAX parse request
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'parse') {
-    header('Content-Type: application/json');
+    header('Content-Type: application/json; charset=utf-8');
 
-    $inputText = $_POST['input_text'] ?? '';
-    $parsed = [];
-    $errors = [];
+    try {
+        $inputText = $_POST['input_text'] ?? '';
+        $parsed = [];
+        $errors = [];
 
     // Parse input text - each line is "code quantity"
     $lines = preg_split('/[\r\n]+/', trim($inputText));
@@ -71,16 +72,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
     }
 
-    echo json_encode(['success' => true, 'items' => $parsed, 'errors' => $errors]);
+        echo json_encode(['success' => true, 'items' => $parsed, 'errors' => $errors], JSON_UNESCAPED_UNICODE);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
     exit;
 }
 
 // Handle import submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'import') {
-    header('Content-Type: application/json');
+    header('Content-Type: application/json; charset=utf-8');
 
     if (!validateCsrfToken()) {
-        echo json_encode(['success' => false, 'error' => 'Neplatný bezpečnostní token.']);
+        echo json_encode(['success' => false, 'error' => 'Neplatný bezpečnostní token.'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -90,12 +94,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $movementDate = sanitize($_POST['movement_date'] ?? date('Y-m-d'));
 
     if (!$locationId) {
-        echo json_encode(['success' => false, 'error' => 'Vyberte sklad.']);
+        echo json_encode(['success' => false, 'error' => 'Vyberte sklad.'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
     if (empty($items)) {
-        echo json_encode(['success' => false, 'error' => 'Žádné položky k importu.']);
+        echo json_encode(['success' => false, 'error' => 'Žádné položky k importu.'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -161,12 +165,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         echo json_encode([
             'success' => true,
             'message' => "Úspěšně importováno $importedCount položek ($totalPieces ks)."
-        ]);
+        ], JSON_UNESCAPED_UNICODE);
 
     } catch (Exception $e) {
         $db->rollBack();
         error_log("Bulk stock receipt error: " . $e->getMessage());
-        echo json_encode(['success' => false, 'error' => 'Chyba při importu: ' . $e->getMessage()]);
+        echo json_encode(['success' => false, 'error' => 'Chyba při importu: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
     exit;
 }
@@ -416,19 +420,34 @@ async function parseInput() {
             body: formData
         });
 
-        const result = await response.json();
+        const text = await response.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (e) {
+            console.error('Invalid JSON response:', text);
+            alert('Chyba při zpracování: Server vrátil neplatnou odpověď');
+            return;
+        }
 
         if (result.success) {
-            parsedItems = result.items;
+            parsedItems = result.items || [];
+
+            if (parsedItems.length === 0 && (!result.errors || result.errors.length === 0)) {
+                alert('Nebyly nalezeny žádné platné položky.');
+                return;
+            }
 
             // Show errors if any
             const errorsDiv = document.getElementById('parseErrors');
-            if (result.errors && result.errors.length > 0) {
-                errorsDiv.innerHTML = '<strong>Varování:</strong><ul>' +
-                    result.errors.map(e => `<li>${e}</li>`).join('') + '</ul>';
-                errorsDiv.style.display = 'block';
-            } else {
-                errorsDiv.style.display = 'none';
+            if (errorsDiv) {
+                if (result.errors && result.errors.length > 0) {
+                    errorsDiv.innerHTML = '<strong>Varování:</strong><ul>' +
+                        result.errors.map(e => `<li>${escapeHtml(e)}</li>`).join('') + '</ul>';
+                    errorsDiv.style.display = 'block';
+                } else {
+                    errorsDiv.style.display = 'none';
+                }
             }
 
             // Render items table
@@ -438,7 +457,7 @@ async function parseInput() {
             document.getElementById('step1').style.display = 'none';
             document.getElementById('step2').style.display = 'block';
         } else {
-            alert('Chyba: ' + result.error);
+            alert('Chyba: ' + (result.error || 'Neznámá chyba'));
         }
     } catch (error) {
         alert('Chyba při zpracování: ' + error.message);
