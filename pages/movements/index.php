@@ -264,6 +264,7 @@ require __DIR__ . '/../../includes/header.php';
     <h1>🔄 <?= e($pageTitle) ?></h1>
     <div class="page-actions">
         <a href="<?= url('movements/prijem') ?>" class="btn btn-success">➕ Nový příjem</a>
+        <a href="<?= url('movements/hromadny-prijem') ?>" class="btn btn-success">📦 Hromadný příjem</a>
         <a href="<?= url('movements/vydej') ?>" class="btn btn-primary">➖ Nový výdej</a>
         <a href="<?= url('stock') ?>" class="btn btn-secondary">📦 Přehled skladu</a>
     </div>
