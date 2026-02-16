@@ -107,11 +107,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ");
 
         $itemCount = 0;
+        $insertedItems = []; // Track inserted item_id + location_id combinations to avoid duplicates
         foreach ($items as $item) {
             // Skip zero stock items if not included (only for specific location)
             if ($locationId > 0 && !$includeZeroStock && $item['current_stock'] == 0) {
                 continue;
             }
+
+            // Create unique key for item + location combination
+            $uniqueKey = $item['item_id'] . '-' . ($item['location_id'] ?? 'null');
+            if (isset($insertedItems[$uniqueKey])) {
+                continue; // Skip duplicate
+            }
+            $insertedItems[$uniqueKey] = true;
 
             $insertStmt->execute([
                 $stocktakingId,
