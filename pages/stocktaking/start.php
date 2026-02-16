@@ -107,19 +107,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ");
 
         $itemCount = 0;
-        $insertedItems = []; // Track inserted item_id + location_id combinations to avoid duplicates
+        $insertedItems = []; // Track inserted item_ids to avoid duplicates (unique constraint is on stocktaking_id + item_id)
         foreach ($items as $item) {
             // Skip zero stock items if not included (only for specific location)
             if ($locationId > 0 && !$includeZeroStock && $item['current_stock'] == 0) {
                 continue;
             }
 
-            // Create unique key for item + location combination
-            $uniqueKey = $item['item_id'] . '-' . ($item['location_id'] ?? 'null');
-            if (isset($insertedItems[$uniqueKey])) {
+            // Skip if this item_id was already inserted (DB has unique constraint on stocktaking_id + item_id)
+            $itemId = $item['item_id'];
+            if (isset($insertedItems[$itemId])) {
                 continue; // Skip duplicate
             }
-            $insertedItems[$uniqueKey] = true;
+            $insertedItems[$itemId] = true;
 
             $insertStmt->execute([
                 $stocktakingId,
