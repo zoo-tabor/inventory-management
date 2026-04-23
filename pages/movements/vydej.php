@@ -518,9 +518,11 @@ function handleInputTypeChange() {
 
     if (inputType === 'packages') {
         quantityInput.step = '0.01';
+        quantityInput.min = '0.01';
         quantityInput.placeholder = 'Počet balení';
     } else {
         quantityInput.step = '1';
+        quantityInput.min = '1';
         quantityInput.placeholder = 'Počet kusů';
     }
 
