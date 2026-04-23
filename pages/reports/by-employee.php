@@ -17,16 +17,28 @@ $departmentFilter = (int)($_GET['department'] ?? 0);
 $dateFrom = sanitize($_GET['date_from'] ?? date('Y-m-01')); // First day of current month
 $dateTo = sanitize($_GET['date_to'] ?? date('Y-m-d')); // Today
 
-// Get employees
+// Get active employees
 $stmt = $db->prepare("
     SELECT e.id, e.full_name, d.name as department_name
     FROM employees e
     LEFT JOIN departments d ON e.department_id = d.id
-    WHERE e.company_id = ?
+    WHERE e.company_id = ? AND e.is_active = 1
     ORDER BY e.full_name
 ");
 $stmt->execute([getCurrentCompanyId()]);
 $employees = $stmt->fetchAll();
+
+// Pre-populate employee search text if filter is active
+$employeeFilterName = '';
+if ($employeeFilter) {
+    foreach ($employees as $emp) {
+        if ((int)$emp['id'] === $employeeFilter) {
+            $employeeFilterName = $emp['full_name'];
+            if ($emp['department_name']) $employeeFilterName .= ' (' . $emp['department_name'] . ')';
+            break;
+        }
+    }
+}
 
 // Get departments
 $stmt = $db->prepare("SELECT id, name FROM departments WHERE company_id = ? ORDER BY name");
@@ -161,19 +173,27 @@ require __DIR__ . '/../../includes/header.php';
             <input type="hidden" name="route" value="reports/by-employee">
 
             <div class="form-row">
-                <div class="form-group">
+                <div class="form-group" style="position: relative;">
                     <label>Zaměstnanec</label>
-                    <select name="employee" class="form-control">
+                    <input
+                        type="text"
+                        id="employee_filter_search"
+                        class="form-control"
+                        placeholder="Začněte psát jméno..."
+                        autocomplete="off"
+                        value="<?= e($employeeFilterName) ?>"
+                    >
+                    <select name="employee" id="employee_filter_select" class="form-control" style="display: none;">
                         <option value="">Všichni zaměstnanci</option>
                         <?php foreach ($employees as $emp): ?>
-                            <option value="<?= $emp['id'] ?>" <?= $employeeFilter === $emp['id'] ? 'selected' : '' ?>>
-                                <?= e($emp['full_name']) ?> <?= e($emp) ?>
-                                <?php if ($emp['department_name']): ?>
-                                    (<?= e($emp['department_name']) ?>)
-                                <?php endif; ?>
+                            <option value="<?= $emp['id'] ?>"
+                                data-search-text="<?= e(strtolower($emp['full_name'] . ' ' . ($emp['department_name'] ?? ''))) ?>"
+                                <?= $employeeFilter === (int)$emp['id'] ? 'selected' : '' ?>>
+                                <?= e($emp['full_name']) ?><?= $emp['department_name'] ? ' (' . e($emp['department_name']) . ')' : '' ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
+                    <div id="employee_filter_dropdown" class="search-dropdown" style="display: none;"></div>
                 </div>
 
                 <div class="form-group">
@@ -254,7 +274,7 @@ require __DIR__ . '/../../includes/header.php';
                             <tr class="<?= $employeeFilter === $stat['id'] ? 'row-selected' : '' ?>">
                                 <td>
                                     <strong>
-                                        <?= e($stat['full_name']) ?> <?= e($stat) ?>
+                                        <?= e($stat['full_name']) ?>
                                     </strong>
                                 </td>
                                 <td><?= e($stat['department_name'] ?? '-') ?></td>
@@ -406,6 +426,30 @@ require __DIR__ . '/../../includes/header.php';
 <?php endif; ?>
 
 <style>
+.search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+}
+.search-dropdown-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 0.9rem;
+}
+.search-dropdown-item:last-child { border-bottom: none; }
+.search-dropdown-item:hover,
+.search-dropdown-item.selected { background: #e0f2fe; }
+
 .filter-form .form-row {
     display: grid;
     grid-template-columns: 2fr 1.5fr 1fr 1fr auto;
@@ -438,5 +482,82 @@ require __DIR__ . '/../../includes/header.php';
     background-color: #dbeafe;
 }
 </style>
+
+<script>
+let filteredFilterEmployees = [];
+let selectedFilterEmployeeIndex = -1;
+const empFilterSearch = document.getElementById('employee_filter_search');
+const empFilterSelect = document.getElementById('employee_filter_select');
+const empFilterDropdown = document.getElementById('employee_filter_dropdown');
+
+empFilterSearch.addEventListener('input', function() {
+    const searchText = this.value.toLowerCase().trim();
+    empFilterSelect.value = '';
+    if (searchText === '') {
+        empFilterDropdown.style.display = 'none';
+        return;
+    }
+    filteredFilterEmployees = [];
+    empFilterSelect.querySelectorAll('option').forEach(function(opt, i) {
+        if (i === 0) return;
+        const text = opt.getAttribute('data-search-text');
+        if (text && text.includes(searchText)) {
+            filteredFilterEmployees.push({ value: opt.value, text: opt.textContent.trim() });
+        }
+    });
+    if (filteredFilterEmployees.length > 0) {
+        empFilterDropdown.innerHTML = filteredFilterEmployees.map(function(e, i) {
+            return '<div class="search-dropdown-item" data-index="' + i + '">' + e.text + '</div>';
+        }).join('');
+        empFilterDropdown.style.display = 'block';
+    } else {
+        empFilterDropdown.innerHTML = '<div class="search-dropdown-item" style="color:#999;">Žádný zaměstnanec nenalezen</div>';
+        empFilterDropdown.style.display = 'block';
+    }
+    selectedFilterEmployeeIndex = -1;
+});
+
+empFilterSearch.addEventListener('keydown', function(e) {
+    const items = empFilterDropdown.querySelectorAll('.search-dropdown-item[data-index]');
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (selectedFilterEmployeeIndex < filteredFilterEmployees.length - 1) {
+            selectedFilterEmployeeIndex++;
+            items.forEach(function(item, i) { item.classList.toggle('selected', i === selectedFilterEmployeeIndex); });
+        }
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (selectedFilterEmployeeIndex > 0) {
+            selectedFilterEmployeeIndex--;
+            items.forEach(function(item, i) { item.classList.toggle('selected', i === selectedFilterEmployeeIndex); });
+        }
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (selectedFilterEmployeeIndex >= 0 && filteredFilterEmployees[selectedFilterEmployeeIndex]) {
+            selectFilterEmployee(filteredFilterEmployees[selectedFilterEmployeeIndex]);
+        }
+    } else if (e.key === 'Escape') {
+        empFilterDropdown.style.display = 'none';
+    }
+});
+
+empFilterDropdown.addEventListener('click', function(e) {
+    const item = e.target.closest('.search-dropdown-item[data-index]');
+    if (item) selectFilterEmployee(filteredFilterEmployees[parseInt(item.getAttribute('data-index'))]);
+});
+
+function selectFilterEmployee(emp) {
+    empFilterSelect.value = emp.value;
+    empFilterSearch.value = emp.text;
+    empFilterDropdown.style.display = 'none';
+    selectedFilterEmployeeIndex = -1;
+}
+
+document.addEventListener('click', function(e) {
+    if (!empFilterSearch.contains(e.target) && !empFilterDropdown.contains(e.target)) {
+        empFilterDropdown.style.display = 'none';
+    }
+});
+</script>
 
 <?php require __DIR__ . '/../../includes/footer.php'; ?>
