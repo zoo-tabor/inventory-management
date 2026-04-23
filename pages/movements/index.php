@@ -245,6 +245,7 @@ $stmt = $db->prepare("
         COUNT(*) as count,
         SUM(quantity) as total_quantity
     FROM stock_movements sm
+    INNER JOIN items i ON sm.item_id = i.id
     WHERE $whereSQL
     GROUP BY movement_type
 ");
