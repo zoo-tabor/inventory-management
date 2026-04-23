@@ -107,6 +107,9 @@ foreach ($stockData as $row) {
 if (!empty($statusFilter)) {
     $itemsStock = array_filter($itemsStock, function($item) use ($statusFilter) {
         $status = getStockStatus($item['total_quantity'], $item['minimum_stock']);
+        if ($statusFilter === 'warning') {
+            return $status === STOCK_STATUS_LOW || $status === STOCK_STATUS_CRITICAL;
+        }
         return $status === $statusFilter;
     });
 }
@@ -217,6 +220,7 @@ require __DIR__ . '/../../includes/header.php';
                     <select name="status" class="form-control">
                         <option value="">Všechny stavy</option>
                         <option value="ok" <?= $statusFilter === 'ok' ? 'selected' : '' ?>>OK</option>
+                        <option value="warning" <?= $statusFilter === 'warning' ? 'selected' : '' ?>>Nízký nebo kritický stav</option>
                         <option value="low" <?= $statusFilter === 'low' ? 'selected' : '' ?>>Nízký stav</option>
                         <option value="critical" <?= $statusFilter === 'critical' ? 'selected' : '' ?>>Kritický stav</option>
                     </select>
