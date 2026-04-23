@@ -82,7 +82,7 @@ include __DIR__ . '/../includes/header.php';
                 <div class="stat-value"><?= formatNumber($lowStockItems) ?></div>
             </div>
             <?php if ($lowStockItems > 0): ?>
-                <a href="/stock?filter=low" class="stat-link">Zobrazit →</a>
+                <a href="<?= url('stock') ?>?status=low" class="stat-link">Zobrazit →</a>
             <?php endif; ?>
         </div>
 
