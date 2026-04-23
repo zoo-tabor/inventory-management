@@ -317,8 +317,8 @@ require __DIR__ . '/../../includes/header.php';
                         name="quantity"
                         id="quantity"
                         class="form-control"
-                        min="0.01"
-                        step="0.01"
+                        min="1"
+                        step="1"
                         required
                         onchange="handleQuantityChange()"
                     >
