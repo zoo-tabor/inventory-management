@@ -98,6 +98,55 @@ function getCurrentCompany() {
 }
 
 /**
+ * Get company IDs the given user is allowed to access.
+ * Admins always get all companies. Regular users get their explicit assignments,
+ * or all companies if no assignments have been set yet.
+ *
+ * @param int|null $userId Defaults to current logged-in user
+ * @return int[]
+ */
+function getUserAllowedCompanies($userId = null) {
+    if ($userId === null) {
+        $userId = $_SESSION['user_id'] ?? null;
+    }
+    $allIds = array_keys(COMPANIES);
+
+    // Admins always see everything
+    if ((int)($_SESSION['user_id'] ?? 0) === (int)$userId && isAdmin()) {
+        return $allIds;
+    }
+
+    try {
+        $db = Database::getInstance();
+        // Check role directly when querying for another user
+        $roleStmt = $db->prepare("SELECT role FROM users WHERE id = ?");
+        $roleStmt->execute([$userId]);
+        $row = $roleStmt->fetch();
+        if ($row && $row['role'] === 'admin') {
+            return $allIds;
+        }
+
+        $stmt = $db->prepare("SELECT company_id FROM user_companies WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        // No explicit assignments → unrestricted (backwards compatible)
+        return empty($rows) ? $allIds : array_map('intval', $rows);
+    } catch (Exception $e) {
+        return $allIds;
+    }
+}
+
+/**
+ * Check whether the current user may access a given company.
+ *
+ * @param int $companyId
+ * @return bool
+ */
+function canUserAccessCompany($companyId) {
+    return in_array((int)$companyId, getUserAllowedCompanies(), true);
+}
+
+/**
  * Get company theme class
  *
  * @return string Theme class name

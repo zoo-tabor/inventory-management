@@ -60,9 +60,11 @@ function attemptLogin($username, $password) {
             $_SESSION['user_role'] = $user['role'];
             $_SESSION['user_name'] = $user['full_name'];
 
-            // Set default company if not set
-            if (!isset($_SESSION['current_company'])) {
-                $_SESSION['current_company'] = 1; // Default to EKOSPOL
+            // Set company based on user's allowed companies
+            $allowedCompanies = getUserAllowedCompanies($user['id']);
+            $currentCompany = $_SESSION['current_company'] ?? null;
+            if (!$currentCompany || !in_array((int)$currentCompany, $allowedCompanies, true)) {
+                $_SESSION['current_company'] = $allowedCompanies[0] ?? 1;
             }
 
             // Update last login

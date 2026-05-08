@@ -37,12 +37,15 @@ $themeClass = getThemeClass();
 
             <div class="header-right">
                 <!-- Company Switcher -->
+                <?php $allowedCompanyIds = getUserAllowedCompanies(); ?>
+                <?php if (count($allowedCompanyIds) > 1): ?>
                 <div class="company-switcher">
                     <button type="button" class="company-switcher-btn" id="companySwitcherBtn">
                         <?= e($currentCompany['name']) ?> ▼
                     </button>
                     <div class="company-switcher-dropdown" id="companySwitcherDropdown">
                         <?php foreach (COMPANIES as $compId => $company): ?>
+                            <?php if (!in_array($compId, $allowedCompanyIds, true)) continue; ?>
                             <a href="<?= url('switch-company', ['id' => $compId]) ?>"
                                class="company-item <?= $compId === getCurrentCompanyId() ? 'active' : '' ?>">
                                 <?= e($company['name']) ?>
@@ -53,6 +56,11 @@ $themeClass = getThemeClass();
                         <?php endforeach; ?>
                     </div>
                 </div>
+                <?php else: ?>
+                <div class="company-name-static">
+                    <?= e($currentCompany['name']) ?>
+                </div>
+                <?php endif; ?>
 
                 <!-- Notifications (placeholder for now) -->
                 <div class="header-notifications">

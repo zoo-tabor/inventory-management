@@ -120,6 +120,13 @@
     display: block;
 }
 
+.company-name-static {
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
 .company-item {
     display: flex;
     align-items: center;

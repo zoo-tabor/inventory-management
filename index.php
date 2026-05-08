@@ -82,11 +82,11 @@ switch ($page) {
     case 'switch-company':
         // Handle company switching
         $companyId = (int)($_GET['id'] ?? 0);
-        if (isset(COMPANIES[$companyId])) {
+        if (isset(COMPANIES[$companyId]) && canUserAccessCompany($companyId)) {
             setCurrentCompany($companyId);
             setFlash('success', 'Společnost přepnuta na ' . COMPANIES[$companyId]['name']);
         } else {
-            setFlash('error', 'Neplatná společnost');
+            setFlash('error', 'Nemáte přístup k této společnosti.');
         }
         // Don't redirect - just show dashboard with new company
         $route = 'dashboard';

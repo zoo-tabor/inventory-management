@@ -6,6 +6,19 @@
 
 $pageTitle = 'Uživatelé';
 
+function saveUserCompanies($db, $userId, array $companyIds) {
+    $allIds = array_keys(COMPANIES);
+    // If all companies selected (or none), remove explicit restrictions
+    $valid = array_values(array_intersect($companyIds, $allIds));
+    $db->prepare("DELETE FROM user_companies WHERE user_id = ?")->execute([$userId]);
+    if (!empty($valid) && count($valid) < count($allIds)) {
+        $ins = $db->prepare("INSERT INTO user_companies (user_id, company_id) VALUES (?, ?)");
+        foreach ($valid as $cid) {
+            $ins->execute([$userId, $cid]);
+        }
+    }
+}
+
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validateCsrfToken()) {
@@ -26,6 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $password = $_POST['password'] ?? '';
             $role = sanitize($_POST['role'] ?? 'user');
             $isActive = isset($_POST['is_active']) ? 1 : 0;
+            $selectedCompanies = array_map('intval', $_POST['companies'] ?? []);
 
             if (empty($username)) {
                 setFlash('error', 'Uživatelské jméno je povinné.');
@@ -57,7 +71,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $isActive
                     ]);
 
-                    logAudit('create', 'user', $db->lastInsertId(), "Vytvořen uživatel: $username");
+                    $newId = (int)$db->lastInsertId();
+                    saveUserCompanies($db, $newId, $selectedCompanies);
+                    logAudit('create', 'user', $newId, "Vytvořen uživatel: $username");
                     setFlash('success', 'Uživatel byl úspěšně vytvořen.');
                 }
             }
@@ -71,6 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $password = $_POST['password'] ?? '';
             $role = sanitize($_POST['role'] ?? 'user');
             $isActive = isset($_POST['is_active']) ? 1 : 0;
+            $selectedCompanies = array_map('intval', $_POST['companies'] ?? []);
 
             if (empty($username)) {
                 setFlash('error', 'Uživatelské jméno je povinné.');
@@ -105,6 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt->execute([$username, $fullName, $email, $role, $isActive, $id]);
                     }
 
+                    saveUserCompanies($db, $id, $selectedCompanies);
                     logAudit('update', 'user', $id, "Upraven uživatel: $username");
                     setFlash('success', 'Uživatel byl úspěšně upraven.');
                 }
@@ -161,9 +179,18 @@ try {
     ");
     $users = $stmt->fetchAll();
 
+    // Fetch company assignments for all users
+    $ucStmt = $db->query("SELECT user_id, company_id FROM user_companies");
+    $userCompanyRows = $ucStmt->fetchAll();
+    $userCompanyMap = [];
+    foreach ($userCompanyRows as $row) {
+        $userCompanyMap[(int)$row['user_id']][] = (int)$row['company_id'];
+    }
+
 } catch (Exception $e) {
     error_log("Users fetch error: " . $e->getMessage());
     $users = [];
+    $userCompanyMap = [];
 }
 
 include __DIR__ . '/../../includes/header.php';
@@ -194,6 +221,7 @@ include __DIR__ . '/../../includes/header.php';
                         <th>Celé jméno</th>
                         <th>Email</th>
                         <th>Role</th>
+                        <th>Přístup ke společnostem</th>
                         <th>Poslední přihlášení</th>
                         <th class="text-center">Stav</th>
                         <th class="text-right">Akce</th>
@@ -213,6 +241,18 @@ include __DIR__ . '/../../includes/header.php';
                                 <?php endif; ?>
                             </td>
                             <td>
+                                <?php
+                                $assignedIds = $userCompanyMap[(int)$user['id']] ?? [];
+                                if ($user['role'] === 'admin' || empty($assignedIds)):
+                                ?>
+                                    <span class="text-secondary">Všechny</span>
+                                <?php else: ?>
+                                    <?php foreach ($assignedIds as $cid): ?>
+                                        <span class="badge badge-company"><?= e(COMPANIES[$cid]['name'] ?? $cid) ?></span>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </td>
+                            <td>
                                 <?php if ($user['last_login']): ?>
                                     <?= date('d.m.Y H:i', strtotime($user['last_login'])) ?>
                                 <?php else: ?>
@@ -227,8 +267,12 @@ include __DIR__ . '/../../includes/header.php';
                                 <?php endif; ?>
                             </td>
                             <td class="text-right">
+                                <?php
+                                $editData = $user;
+                                $editData['assigned_companies'] = $userCompanyMap[(int)$user['id']] ?? [];
+                                ?>
                                 <button type="button" class="btn btn-sm btn-secondary"
-                                        onclick='openEditModal(<?= json_encode($user) ?>)'>
+                                        onclick='openEditModal(<?= json_encode($editData) ?>)'>
                                     ✏️ Upravit
                                 </button>
                                 <?php if ($user['id'] != ($_SESSION['user_id'] ?? 0) && $user['audit_count'] == 0): ?>
@@ -288,6 +332,20 @@ include __DIR__ . '/../../includes/header.php';
                         <option value="admin">Admin</option>
                     </select>
                     <small class="form-text">Admin má přístup ke všem funkcím včetně správy uživatelů</small>
+                </div>
+
+                <div class="form-group" id="companiesGroup">
+                    <label>Přístup ke společnostem</label>
+                    <div class="companies-checkboxes">
+                        <?php foreach (COMPANIES as $cid => $company): ?>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="companies[]" value="<?= $cid ?>"
+                                   class="company-checkbox" data-cid="<?= $cid ?>" checked>
+                            <?= e($company['name']) ?>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                    <small class="form-text" id="companiesHelp">Admini mají vždy přístup ke všem společnostem</small>
                 </div>
 
                 <div class="form-group">
@@ -379,6 +437,18 @@ include __DIR__ . '/../../includes/header.php';
         color: #991b1b;
     }
 
+    .badge-company {
+        background: #ede9fe;
+        color: #5b21b6;
+    }
+
+    .companies-checkboxes {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-xs);
+        margin-top: var(--spacing-xs);
+    }
+
     .checkbox-label {
         display: flex;
         align-items: center;
@@ -404,6 +474,20 @@ include __DIR__ . '/../../includes/header.php';
 </style>
 
 <script>
+function setCompanyCheckboxes(assignedIds, isAdmin) {
+    const group = document.getElementById('companiesGroup');
+    const checkboxes = document.querySelectorAll('.company-checkbox');
+    if (isAdmin) {
+        group.style.display = 'none';
+        checkboxes.forEach(cb => { cb.checked = true; });
+        return;
+    }
+    group.style.display = '';
+    checkboxes.forEach(cb => {
+        cb.checked = assignedIds.length === 0 || assignedIds.includes(parseInt(cb.dataset.cid));
+    });
+}
+
 function openCreateModal() {
     document.getElementById('modalTitle').textContent = 'Nový uživatel';
     document.getElementById('formAction').value = 'create';
@@ -417,6 +501,7 @@ function openCreateModal() {
     document.getElementById('passwordHelp').textContent = 'Minimálně 6 znaků';
     document.getElementById('role').value = 'user';
     document.getElementById('is_active').checked = true;
+    setCompanyCheckboxes([], false);
     document.getElementById('userModal').classList.add('active');
 }
 
@@ -433,8 +518,22 @@ function openEditModal(user) {
     document.getElementById('passwordHelp').textContent = 'Nechte prázdné, pokud nechcete změnit heslo';
     document.getElementById('role').value = user.role;
     document.getElementById('is_active').checked = user.is_active == 1;
+    setCompanyCheckboxes(user.assigned_companies || [], user.role === 'admin');
     document.getElementById('userModal').classList.add('active');
 }
+
+// Hide/show company field when role changes
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('role').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.company-checkbox');
+        if (this.value === 'admin') {
+            document.getElementById('companiesGroup').style.display = 'none';
+            checkboxes.forEach(cb => { cb.checked = true; });
+        } else {
+            document.getElementById('companiesGroup').style.display = '';
+        }
+    });
+});
 
 function closeModal() {
     document.getElementById('userModal').classList.remove('active');
