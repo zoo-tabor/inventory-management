@@ -179,18 +179,21 @@ try {
     ");
     $users = $stmt->fetchAll();
 
-    // Fetch company assignments for all users
-    $ucStmt = $db->query("SELECT user_id, company_id FROM user_companies");
-    $userCompanyRows = $ucStmt->fetchAll();
-    $userCompanyMap = [];
-    foreach ($userCompanyRows as $row) {
-        $userCompanyMap[(int)$row['user_id']][] = (int)$row['company_id'];
-    }
-
 } catch (Exception $e) {
     error_log("Users fetch error: " . $e->getMessage());
     $users = [];
-    $userCompanyMap = [];
+}
+
+// Fetch company assignments (table may not exist before migration runs)
+$userCompanyMap = [];
+try {
+    $db = Database::getInstance();
+    $ucStmt = $db->query("SELECT user_id, company_id FROM user_companies");
+    foreach ($ucStmt->fetchAll() as $row) {
+        $userCompanyMap[(int)$row['user_id']][] = (int)$row['company_id'];
+    }
+} catch (Exception $e) {
+    // user_companies table not yet created — ignore
 }
 
 include __DIR__ . '/../../includes/header.php';
