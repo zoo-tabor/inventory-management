@@ -35,6 +35,18 @@ $flashMessages = getFlash();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Přihlášení - <?= e(APP_NAME) ?></title>
+    <!-- Favicons -->
+    <link rel="icon" type="image/x-icon" href="/assets/favicon/04_kostka_check.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon/04_kostka_check-16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon/04_kostka_check-32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="/assets/favicon/04_kostka_check-48.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicon/04_kostka_check-180.png">
+    <link rel="mask-icon" href="/assets/favicon/04_kostka_check.svg" color="#1a5c36">
+    <link rel="icon" type="image/png" sizes="256x256" href="/assets/favicon/04_kostka_check-256.png">
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon/04_kostka_check.svg">
+    <meta name="msapplication-TileImage" content="/assets/favicon/04_kostka_check-256.png">
+    <meta name="msapplication-TileColor" content="#1a5c36">
+    <meta name="theme-color" content="#1a5c36">
     <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body class="login-page theme-ekospol">
