@@ -10,6 +10,9 @@ RewriteEngine On
 RewriteCond %{HTTPS} off
 RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 
+# Serve favicon.ico from assets (Chrome looks here first)
+RewriteRule ^favicon\.ico$ /assets/favicon/04_kostka_check.ico [L]
+
 # Rewrite pretty routes to index.php
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
