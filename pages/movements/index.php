@@ -137,6 +137,17 @@ $stmt = $db->prepare("SELECT id, full_name FROM employees WHERE company_id = ? A
 $stmt->execute([getCurrentCompanyId()]);
 $employees = $stmt->fetchAll();
 
+// Pre-populate item search text if filter is active
+$itemFilterName = '';
+if ($itemFilter) {
+    foreach ($items as $it) {
+        if ((int)$it['id'] === $itemFilter) {
+            $itemFilterName = $it['code'] . ' - ' . $it['name'];
+            break;
+        }
+    }
+}
+
 // Pre-populate employee search text if filter is active
 $employeeFilterName = '';
 if ($employeeFilter) {
@@ -369,16 +380,27 @@ require __DIR__ . '/../../includes/header.php';
                     </select>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" style="position: relative;">
                     <label>Položka</label>
-                    <select name="item" class="form-control">
+                    <input
+                        type="text"
+                        id="item_filter_search"
+                        class="form-control"
+                        placeholder="Začněte psát kód nebo název..."
+                        autocomplete="off"
+                        value="<?= e($itemFilterName) ?>"
+                    >
+                    <select name="item" id="item_filter_select" class="form-control" style="display: none;">
                         <option value="">Všechny položky</option>
-                        <?php foreach ($items as $item): ?>
-                            <option value="<?= $item['id'] ?>" <?= $itemFilter === $item['id'] ? 'selected' : '' ?>>
-                                <?= e($item['code']) ?> - <?= e($item['name']) ?>
+                        <?php foreach ($items as $it): ?>
+                            <option value="<?= $it['id'] ?>"
+                                data-search-text="<?= e(strtolower($it['code'] . ' ' . $it['name'])) ?>"
+                                <?= $itemFilter === (int)$it['id'] ? 'selected' : '' ?>>
+                                <?= e($it['code']) ?> - <?= e($it['name']) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
+                    <div id="item_filter_dropdown" class="search-dropdown" style="display: none;"></div>
                 </div>
 
                 <div class="form-group">
@@ -1037,6 +1059,83 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         closeEditModal();
         empFilterDropdown.style.display = 'none';
+        itemFilterDropdown.style.display = 'none';
+    }
+});
+
+// Item filter search
+let filteredFilterItems = [];
+let selectedFilterItemIndex = -1;
+const itemFilterSearch = document.getElementById('item_filter_search');
+const itemFilterSelect = document.getElementById('item_filter_select');
+const itemFilterDropdown = document.getElementById('item_filter_dropdown');
+
+itemFilterSearch.addEventListener('input', function() {
+    const searchText = this.value.toLowerCase().trim();
+    itemFilterSelect.value = '';
+    if (searchText === '') {
+        itemFilterDropdown.style.display = 'none';
+        return;
+    }
+    filteredFilterItems = [];
+    itemFilterSelect.querySelectorAll('option').forEach(function(opt, i) {
+        if (i === 0) return;
+        const text = opt.getAttribute('data-search-text');
+        if (text && text.includes(searchText)) {
+            filteredFilterItems.push({ value: opt.value, text: opt.textContent.trim() });
+        }
+    });
+    if (filteredFilterItems.length > 0) {
+        itemFilterDropdown.innerHTML = filteredFilterItems.map(function(it, i) {
+            return '<div class="search-dropdown-item" data-index="' + i + '">' + it.text + '</div>';
+        }).join('');
+        itemFilterDropdown.style.display = 'block';
+    } else {
+        itemFilterDropdown.innerHTML = '<div class="search-dropdown-item" style="color:#999;">Žádná položka nenalezena</div>';
+        itemFilterDropdown.style.display = 'block';
+    }
+    selectedFilterItemIndex = -1;
+});
+
+itemFilterSearch.addEventListener('keydown', function(e) {
+    const its = itemFilterDropdown.querySelectorAll('.search-dropdown-item[data-index]');
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (selectedFilterItemIndex < filteredFilterItems.length - 1) {
+            selectedFilterItemIndex++;
+            its.forEach(function(el, i) { el.classList.toggle('selected', i === selectedFilterItemIndex); });
+        }
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (selectedFilterItemIndex > 0) {
+            selectedFilterItemIndex--;
+            its.forEach(function(el, i) { el.classList.toggle('selected', i === selectedFilterItemIndex); });
+        }
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (selectedFilterItemIndex >= 0 && filteredFilterItems[selectedFilterItemIndex]) {
+            selectFilterItem(filteredFilterItems[selectedFilterItemIndex]);
+        }
+    } else if (e.key === 'Escape') {
+        itemFilterDropdown.style.display = 'none';
+    }
+});
+
+itemFilterDropdown.addEventListener('click', function(e) {
+    const el = e.target.closest('.search-dropdown-item[data-index]');
+    if (el) selectFilterItem(filteredFilterItems[parseInt(el.getAttribute('data-index'))]);
+});
+
+function selectFilterItem(it) {
+    itemFilterSelect.value = it.value;
+    itemFilterSearch.value = it.text;
+    itemFilterDropdown.style.display = 'none';
+    selectedFilterItemIndex = -1;
+}
+
+document.addEventListener('click', function(e) {
+    if (!itemFilterSearch.contains(e.target) && !itemFilterDropdown.contains(e.target)) {
+        itemFilterDropdown.style.display = 'none';
     }
 });
 
