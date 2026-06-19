@@ -36,9 +36,8 @@ function url($route, $params = []) {
  * @param string $url URL to redirect to
  */
 function redirect($url) {
-    // If URL doesn't start with http or index.php, convert to query param format
-    if (strpos($url, 'http') !== 0 && strpos($url, 'index.php') !== 0) {
-        // Remove leading slash if present
+    // If URL doesn't already contain index.php or http, convert route name to full URL
+    if (strpos($url, 'http') !== 0 && strpos($url, 'index.php') === false) {
         $url = url(ltrim($url, '/'));
     }
     header('Location: ' . $url);
