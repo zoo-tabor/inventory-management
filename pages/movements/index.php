@@ -269,6 +269,24 @@ foreach ($stmt->fetchAll() as $row) {
     ];
 }
 
+// Current stock for selected item
+$selectedItemStock = null;
+$selectedItemInfo = null;
+if ($itemFilter) {
+    $stmt = $db->prepare("
+        SELECT i.name, i.code, i.unit, COALESCE(SUM(s.quantity), 0) as total_stock
+        FROM items i
+        LEFT JOIN stock s ON i.id = s.item_id
+        WHERE i.id = ? AND i.company_id = ?
+        GROUP BY i.id, i.name, i.code, i.unit
+    ");
+    $stmt->execute([$itemFilter, getCurrentCompanyId()]);
+    $selectedItemInfo = $stmt->fetch();
+    if ($selectedItemInfo) {
+        $selectedItemStock = $selectedItemInfo['total_stock'];
+    }
+}
+
 require __DIR__ . '/../../includes/header.php';
 ?>
 
@@ -307,6 +325,21 @@ require __DIR__ . '/../../includes/header.php';
             <div class="stat-value"><?= formatNumber($totalMovements) ?></div>
         </div>
     </div>
+
+    <?php if ($selectedItemInfo): ?>
+    <?php
+    $stockStatusClass = '';
+    if ($selectedItemStock <= 0) $stockStatusClass = 'stat-danger';
+    ?>
+    <div class="stat-card <?= $stockStatusClass ?>">
+        <div class="stat-icon">📦</div>
+        <div class="stat-content">
+            <div class="stat-label">Aktuálně na skladě</div>
+            <div class="stat-value"><?= formatNumber($selectedItemStock) ?> <small style="font-size:1rem;font-weight:400;"><?= e($selectedItemInfo['unit']) ?></small></div>
+        </div>
+        <a href="<?= url('stock', ['search' => $selectedItemInfo['code']]) ?>" class="stat-link-abs">Zobrazit →</a>
+    </div>
+    <?php endif; ?>
 </div>
 
 <!-- Filters -->
@@ -729,6 +762,27 @@ require __DIR__ . '/../../includes/header.php';
 
 .stat-card.stat-primary {
     border-left: 4px solid #2563eb;
+}
+
+.stat-card.stat-danger {
+    border-left: 4px solid #dc2626;
+}
+
+.stat-card {
+    position: relative;
+}
+
+.stat-link-abs {
+    position: absolute;
+    bottom: 0.75rem;
+    right: 0.75rem;
+    font-size: 0.875rem;
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.stat-link-abs:hover {
+    text-decoration: underline;
 }
 
 .stat-icon {

@@ -152,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $redirectParams['status'] = $_POST['filter_status'];
     }
 
-    redirect('items', $redirectParams);
+    redirect(url('items', $redirectParams));
 }
 
 // Pagination
